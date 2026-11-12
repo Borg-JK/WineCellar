@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --color-wine-50: #fbf3f4;
+  --color-wine-100: #f5e1e4;
+  --color-wine-200: #e9c2c8;
+  --color-wine-300: #d9a4ac;
+  --color-wine-400: #b86a78;
+  --color-wine-500: #94394d;
+  --color-wine-600: #7a2439;
+  --color-wine-700: #5c1a2b;
+  --color-wine-800: #45121f;
+  --color-wine-900: #2e0b14;
+  --color-cream: #faf6f0;
+  --color-sand: #efe7da;
+  --color-ink: #2a2024;
+  --color-gold: #b8893b;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3 { font-family: var(--font-display); }
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none cursor-pointer;
+  }
+  .btn-primary { @apply bg-wine-700 text-cream hover:bg-wine-800; }
+  .btn-soft { @apply bg-wine-100 text-wine-800 hover:bg-wine-200; }
+  .btn-ghost { @apply text-wine-700 hover:bg-wine-50; }
+  .btn-outline { @apply border border-wine-200 bg-white text-wine-800 hover:bg-wine-50; }
+  .card { @apply rounded-2xl border border-sand bg-white shadow-[0_1px_2px_rgba(46,11,20,0.04)]; }
+  .input {
+    @apply w-full rounded-xl border border-sand bg-white px-3.5 py-2.5 text-[16px] outline-none transition placeholder:text-ink/35 focus:border-wine-400 focus:ring-2 focus:ring-wine-100;
+  }
+  .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wide text-ink/55; }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-sand bg-white px-3 py-1.5 text-sm font-medium text-ink/75 transition cursor-pointer select-none;
+  }
+  .chip-on { @apply border-wine-700 bg-wine-700 text-cream; }
+  .tag { @apply inline-flex items-center gap-1 rounded-full bg-sand px-2.5 py-0.5 text-xs font-medium text-ink/70; }
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .fade-in { animation: fade-in 0.25s ease-out both; }
+  @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+}
