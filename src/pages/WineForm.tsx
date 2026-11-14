@@ -7,7 +7,7 @@ import { useApp, useMe } from '../state/AppContext'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { ErrorNote, Field, Spinner } from '../components/ui'
 
-const COUNTRIES = ['France', 'Italy', 'Spain', 'Portugal', 'Germany', 'Austria', 'Netherlands', 'Greece', 'Hungary', 'South Africa', 'Chile', 'Argentina', 'United States', 'Australia', 'New Zealand']
+const COUNTRIES = ['France', 'Italy', 'Spain', 'Portugal', 'Germany', 'Austria', 'Netherlands', 'Greece', 'Hungary', 'Georgia', 'Lebanon', 'South Africa', 'Chile', 'Argentina', 'United States', 'Canada', 'Australia', 'New Zealand']
 const GRAPES = ['Cabernet Sauvignon', 'Merlot', 'Pinot Noir', 'Syrah', 'Shiraz', 'Grenache', 'Tempranillo', 'Sangiovese', 'Malbec', 'Primitivo', 'Nebbiolo', 'Gamay', 'Chardonnay', 'Sauvignon Blanc', 'Pinot Grigio', 'Riesling', 'Chenin Blanc', 'Verdejo', 'Viognier', 'Grüner Veltliner', 'Albariño', 'Glera']
 
 /** Add a wine by hand, or edit one you added (route /wines/:id/edit). */
@@ -42,7 +42,8 @@ export function WineForm() {
         nav(`/wines/${existing.id}`, { replace: true })
       } else {
         const wine = await createWine(me.id, data, photos)
-        nav(params.get('next') === 'log' ? `/log/${wine.id}` : `/wines/${wine.id}`, { replace: true })
+        const next = params.get('next')
+        nav(next === 'log' ? `/log/${wine.id}` : next === 'cellar' ? `/wines/${wine.id}?cellar=add` : `/wines/${wine.id}`, { replace: true })
       }
     } catch (err) { setError(errMsg(err)); setBusy(false) }
   }

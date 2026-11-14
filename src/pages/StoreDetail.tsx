@@ -3,7 +3,7 @@ import { ExternalLink, MapPin, Store as StoreIcon } from 'lucide-react'
 import { useApp } from '../state/AppContext'
 import { WineRow } from '../components/WineCard'
 import { Empty } from '../components/ui'
-import { euro } from '../lib/util'
+import { checkinCost, euro } from '../lib/util'
 
 export function StoreDetail() {
   const { id = '' } = useParams()
@@ -13,7 +13,7 @@ export function StoreDetail() {
 
   const here = wines.filter((w) => w.storeIds.includes(id))
   const bought = myCheckins.filter((c) => c.storeId === id)
-  const spent = bought.reduce((s, c) => s + (c.price ?? 0), 0)
+  const spent = bought.reduce((s, c) => s + checkinCost(c), 0)
   const friendsHere = new Set(feed.filter((c) => c.storeId === id).map((c) => c.uid)).size
   const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${store.name} ${store.address ?? ''} Rotterdam`)}`
 

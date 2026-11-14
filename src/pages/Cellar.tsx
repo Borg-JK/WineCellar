@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bookmark, Clock, Minus, Pencil, Plus, RotateCcw, Trash2, Warehouse, Wine as WineIcon } from 'lucide-react'
-import { changeCellarQuantity, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
-import type { CellarItem } from '../lib/types'
+import { addToCellar, changeCellarQuantity, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
+import type { CellarItem, Wine } from '../lib/types'
 import { euro } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { CellarForm } from '../components/CellarForm'
 import { WineRow } from '../components/WineCard'
 import { Empty, Sheet, Tabs } from '../components/ui'
+import { WineSearch } from './Explore'
 
 type Tab = 'home' | 'wishlist' | 'again'
 const YEAR = new Date().getFullYear()
@@ -25,6 +26,9 @@ export function Cellar() {
   const { cellar, wishlist, myCheckins, wineMap } = useApp()
   const [tab, setTab] = useState<Tab>('home')
   const [editing, setEditing] = useState<CellarItem | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [picked, setPicked] = useState<Wine | null>(null)
+  const closeAdd = () => { setAdding(false); setPicked(null) }
 
   const bottles = cellar.reduce((s, i) => s + i.quantity, 0)
   const value = cellar.reduce((s, i) => s + i.quantity * (i.price ?? 0), 0)
@@ -50,7 +54,7 @@ export function Cellar() {
           </div>
           {cellar.length === 0 ? (
             <Empty icon={<Warehouse size={28} />} title="Your cellar is empty">
-              Keep track of the bottles you have at home. Open a wine's page and tap "Add to cellar".
+              Keep track of the bottles you have at home. Tap "Add a bottle" below to start.
             </Empty>
           ) : cellar.map((i) => {
             const st = drinkStatus(i)
@@ -78,7 +82,7 @@ export function Cellar() {
               </div>
             )
           })}
-          <Link to="/explore" className="btn btn-soft w-full"><Plus size={18} /> Find a wine to add</Link>
+          <button className="btn btn-primary w-full" onClick={() => setAdding(true)}><Plus size={18} /> Add a bottle</button>
         </>
       )}
 
@@ -95,6 +99,15 @@ export function Cellar() {
         <WineRow key={wineId} wine={wineMap.get(wineId)!} to={`/wines/${wineId}`}
           sub={<p className="mt-0.5 text-xs text-wine-600">You gave it {info.rating ? info.rating.toFixed(1) : '–'}{info.store && ` · bought at ${info.store}`}</p>} />
       )))}
+
+      <Sheet open={adding} onClose={closeAdd} title={picked ? 'Add to cellar' : 'Which wine?'}>
+        {picked ? (
+          <div className="space-y-4">
+            <WineRow wine={picked} right={<button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setPicked(null)}>Change</button>} />
+            <CellarForm key={picked.id} submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, picked, v); closeAdd() }} />
+          </div>
+        ) : <WineSearch onPick={setPicked} addLink="/wines/new?next=cellar" />}
+      </Sheet>
 
       <Sheet open={!!editing} onClose={() => setEditing(null)} title="Edit cellar entry">
         {editing && <CellarForm key={editing.id} initial={editing} submitLabel="Save" onSubmit={async (v) => { await updateCellarItem(me.id, editing.id, v); setEditing(null) }} />}

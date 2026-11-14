@@ -1,4 +1,4 @@
-export const WINE_TYPES = ['red', 'white', 'rosé', 'sparkling', 'orange', 'dessert', 'fortified'] as const
+export const WINE_TYPES = ['red', 'white', 'rosé', 'sparkling', 'champagne', 'orange', 'dessert', 'fortified'] as const
 export type WineType = (typeof WINE_TYPES)[number]
 
 export interface Wine {
@@ -55,6 +55,9 @@ export interface Friendship {
   status: 'pending' | 'accepted'
 }
 
+/** A whole bottle (or your share of one), or one or more glasses at a bar or restaurant. */
+export type Serving = 'bottle' | 'glass'
+
 export interface Checkin {
   id: string
   uid: string
@@ -66,7 +69,11 @@ export interface Checkin {
   vintage: number | null
   storeId: string
   storeName: string
+  /** Per bottle, or per glass when `serving` is 'glass'. */
   price: number | null
+  serving: Serving
+  /** Number of glasses; only set when `serving` is 'glass'. */
+  glasses: number | null
   notes: string
   tags: string[]
   occasion: string
@@ -88,7 +95,7 @@ export interface Checkin {
 
 export type CheckinInput = Pick<
   Checkin,
-  | 'rating' | 'vintage' | 'storeId' | 'storeName' | 'price' | 'notes' | 'tags' | 'occasion'
+  | 'rating' | 'vintage' | 'storeId' | 'storeName' | 'price' | 'serving' | 'glasses' | 'notes' | 'tags' | 'occasion'
   | 'pairing' | 'location' | 'withUids' | 'withNames' | 'buyAgain' | 'private' | 'drankAt'
 >
 

@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import { Camera, LogOut, Pencil, Wine as WineIcon } from 'lucide-react'
+import { Camera, LogOut, Pencil, Users, Wine as WineIcon } from 'lucide-react'
 import { auth, db } from '../lib/firebase'
 import { getProfile, read, updateProfileDoc, uploadAvatar } from '../lib/db'
 import { computeBadges, computeStats } from '../lib/stats'
 import type { Checkin, UserProfile } from '../lib/types'
 import { cx, errMsg, euro, TYPE_COLOUR } from '../lib/util'
-import { useApp, useMe } from '../state/AppContext'
+import { checkinDefaults, useApp, useMe } from '../state/AppContext'
 import { CheckinCard } from '../components/CheckinCard'
 import { Avatar, Empty, ErrorNote, Field, FullSpinner, Sheet, Spinner, Stars, Tabs } from '../components/ui'
 import { FriendButton } from './Friends'
@@ -41,7 +41,7 @@ export function Profile() {
 
   const person = isMe ? me : other
   const checkins = useMemo(
-    () => (isMe ? myCheckins : (theirs ?? feed.filter((c) => c.uid === uid)).map((c) => ({ ...c, tags: c.tags ?? [], momentPhotos: c.momentPhotos ?? [], bottlePhotos: c.bottlePhotos ?? [], cheers: c.cheers ?? [], withUids: c.withUids ?? [], withNames: c.withNames ?? [], notes: c.notes ?? '' }))),
+    () => (isMe ? myCheckins : (theirs ?? feed.filter((c) => c.uid === uid)).map(checkinDefaults)),
     [isMe, myCheckins, theirs, feed, uid],
   )
   const stats = useMemo(() => computeStats(checkins, wineMap), [checkins, wineMap])
@@ -55,7 +55,12 @@ export function Profile() {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4">
-        <Avatar src={person.photoURL} name={person.displayName} size={76} />
+        {isMe ? (
+          <button type="button" aria-label={me.photoURL ? 'Change profile photo' : 'Add a profile photo'} onClick={() => setEditOpen(true)} className="relative shrink-0 cursor-pointer">
+            <Avatar src={person.photoURL} name={person.displayName} size={76} />
+            <span className="absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-cream bg-wine-700 p-1.5 text-white"><Camera size={13} /></span>
+          </button>
+        ) : <Avatar src={person.photoURL} name={person.displayName} size={76} />}
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-semibold">{person.displayName}</h1>
           <p className="text-sm text-ink/55">@{person.username}</p>
@@ -65,6 +70,7 @@ export function Profile() {
       {isMe ? (
         <div className="flex gap-2">
           <button className="btn btn-outline flex-1" onClick={() => setEditOpen(true)}><Pencil size={16} /> Edit profile</button>
+          <Link to="/friends" className="btn btn-outline"><Users size={16} /> {friendIds.length}</Link>
           <button className="btn btn-ghost" onClick={() => signOut(auth)}><LogOut size={16} /> Log out</button>
         </div>
       ) : <FriendButton other={person.id} />}

@@ -35,11 +35,12 @@ export function useMe() {
   return profile as UserProfile
 }
 
-const checkinDefaults = (c: Checkin): Checkin => ({
+export const checkinDefaults = (c: Checkin): Checkin => ({
   ...c,
   tags: c.tags ?? [], momentPhotos: c.momentPhotos ?? [], bottlePhotos: c.bottlePhotos ?? [],
   cheers: c.cheers ?? [], visibleTo: c.visibleTo ?? [], withUids: c.withUids ?? [], withNames: c.withNames ?? [],
   notes: c.notes ?? '', storeName: c.storeName ?? '', commentCount: c.commentCount ?? 0,
+  serving: c.serving ?? 'bottle', glasses: c.glasses ?? null,
 })
 
 export function AppProvider({ children }: { children: ReactNode }) {

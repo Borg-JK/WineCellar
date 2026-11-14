@@ -2,14 +2,14 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { ChevronRight, Plus, Search, Store as StoreIcon } from 'lucide-react'
 import { createStore } from '../lib/db'
-import { WINE_TYPES, type Store, type WineType } from '../lib/types'
+import { WINE_TYPES, type Store, type Wine, type WineType } from '../lib/types'
 import { cx, errMsg, matchesWine } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { WineRow } from '../components/WineCard'
 import { ErrorNote, Field, Sheet, Spinner, Tabs } from '../components/ui'
 
 /** Search box + type and store filters over the merged catalogue. Also used as the picker on the Log page. */
-export function WineSearch({ linkTo, addLink }: { linkTo: (id: string) => string; addLink: string }) {
+export function WineSearch({ linkTo, onPick, addLink }: { linkTo?: (id: string) => string; onPick?: (w: Wine) => void; addLink: string }) {
   const { wines, stores } = useApp()
   const [q, setQ] = useState('')
   const [type, setType] = useState<WineType | null>(null)
@@ -35,7 +35,12 @@ export function WineSearch({ linkTo, addLink }: { linkTo: (id: string) => string
       </select>
       <p className="text-xs text-ink/50">{results.length} wine{results.length === 1 ? '' : 's'}</p>
       <div className="space-y-2">
-        {results.slice(0, 80).map((w) => <WineRow key={w.id} wine={w} to={linkTo(w.id)} right={<ChevronRight size={18} className="text-ink/30" />} />)}
+        {results.slice(0, 80).map((w) => onPick ? (
+          <button key={w.id} type="button" className="block w-full cursor-pointer text-left" onClick={() => onPick(w)}>
+            <WineRow wine={w} right={<ChevronRight size={18} className="text-ink/30" />} />
+          </button>
+        ) : <WineRow key={w.id} wine={w} to={linkTo?.(w.id)} right={<ChevronRight size={18} className="text-ink/30" />} />)}
+        {results.length > 80 && <p className="px-1 text-xs text-ink/50">Showing the first 80. Type more of the name to narrow it down.</p>}
       </div>
       <Link to={addLink} className="card flex items-center gap-3 border-dashed !border-wine-300 bg-wine-50 p-4 text-sm font-semibold text-wine-800">
         <Plus size={20} /> Can't find it? Add the wine yourself

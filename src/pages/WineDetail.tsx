@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bookmark, Camera, Leaf, Pencil, Plus, Warehouse } from 'lucide-react'
 import { addBottlePhotos, addToCellar, toggleWishlist } from '../lib/db'
 import { avgRating, cx, errMsg } from '../lib/util'
@@ -13,7 +13,8 @@ export function WineDetail() {
   const me = useMe()
   const { wineMap, storeMap, feed, myCheckins, wishlist, cellar } = useApp()
   const wine = wineMap.get(id)
-  const [cellarOpen, setCellarOpen] = useState(false)
+  const [params] = useSearchParams()
+  const [cellarOpen, setCellarOpen] = useState(params.get('cellar') === 'add')
   const [zoom, setZoom] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)

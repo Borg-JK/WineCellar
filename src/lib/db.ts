@@ -53,11 +53,19 @@ export async function getProfile(uid: string): Promise<UserProfile | null> {
   return s.exists() ? read<UserProfile>(s) : null
 }
 
+/** Prefix search on username, and on display name (as typed and with capitalised words). */
 export async function searchUsers(text: string): Promise<UserProfile[]> {
-  const q = text.trim().toLowerCase().replace(/^@/, '')
-  if (q.length < 2) return []
-  const s = await getDocs(query(collection(db, 'users'), where('username', '>=', q), where('username', '<=', q + ''), limit(12)))
-  return s.docs.map((d) => read<UserProfile>(d))
+  const raw = text.trim().replace(/^@/, '')
+  if (raw.length < 2) return []
+  const users = collection(db, 'users')
+  const prefix = (field: string, v: string) =>
+    getDocs(query(users, where(field, '>=', v), where(field, '<=', v + '\uf8ff'), limit(12)))
+  const capitalised = raw.replace(/(^|\s)\S/g, (c) => c.toUpperCase())
+  const names = [...new Set([raw, capitalised])]
+  const snaps = await Promise.all([prefix('username', raw.toLowerCase()), ...names.map((n) => prefix('displayName', n))])
+  const out = new Map<string, UserProfile>()
+  for (const s of snaps) for (const d of s.docs) out.set(d.id, read<UserProfile>(d))
+  return [...out.values()].slice(0, 20)
 }
 
 /* ───────────── Friends ───────────── */

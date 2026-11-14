@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { Lock, MapPin, MessageCircle, RotateCcw, Send, ShoppingBag, Trash2, Utensils, Wine as WineIcon } from 'lucide-react'
+import { GlassWater, Lock, MapPin, MessageCircle, RotateCcw, Send, ShoppingBag, Trash2, Utensils, Wine as WineIcon } from 'lucide-react'
 import { db } from '../lib/firebase'
 import { addComment, deleteCheckin, deleteComment, read, toggleCheers } from '../lib/db'
 import type { Checkin, Comment } from '../lib/types'
-import { cx, euro, timeAgo } from '../lib/util'
+import { cx, euro, servingLabel, timeAgo } from '../lib/util'
 import { useMe } from '../state/AppContext'
 import { Avatar, BottleImage, Lightbox, Stars, TypeDot } from './ui'
 
@@ -64,7 +64,8 @@ export function CheckinCard({ c }: { c: Checkin }) {
         {c.notes && <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{c.notes}</p>}
         {c.tags.length > 0 && <div className="flex flex-wrap gap-1.5">{c.tags.map((t) => <span key={t} className="tag">{t}</span>)}</div>}
         <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink/60">
-          {c.storeName && <span className="inline-flex items-center gap-1"><ShoppingBag size={13} /> {c.storeName}{c.price ? ` · ${euro(c.price)}` : ''}</span>}
+          {c.serving === 'glass' && <span className="inline-flex items-center gap-1 font-medium text-wine-700"><GlassWater size={13} /> {servingLabel(c)}{c.price ? ` · ${euro(c.price)} a glass` : ''}</span>}
+          {c.storeName && <span className="inline-flex items-center gap-1"><ShoppingBag size={13} /> {c.storeName}{c.price && c.serving !== 'glass' ? ` · ${euro(c.price)}` : ''}</span>}
           {c.pairing && <span className="inline-flex items-center gap-1"><Utensils size={13} /> {c.pairing}</span>}
           {c.location && <span className="inline-flex items-center gap-1"><MapPin size={13} /> {c.location}</span>}
           {c.buyAgain && <span className="inline-flex items-center gap-1 font-medium text-wine-600"><RotateCcw size={13} /> Would buy again</span>}

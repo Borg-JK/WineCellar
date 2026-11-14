@@ -1,4 +1,4 @@
-import type { Wine, WineSnap, WineType } from './types'
+import type { Checkin, Wine, WineSnap, WineType } from './types'
 
 export const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(' ')
 
@@ -21,10 +21,21 @@ export const TYPE_COLOUR: Record<WineType, string> = {
   white: '#e3cf7a',
   rosé: '#eba3a9',
   sparkling: '#d9c9a3',
+  champagne: '#c9a55c',
   orange: '#d98a3d',
   dessert: '#c79a2b',
   fortified: '#4a2a1a',
 }
+
+/** Champagne is its own type, but counts as sparkling for badges. */
+export const isBubbly = (t: WineType) => t === 'sparkling' || t === 'champagne'
+
+/** What a check-in cost: the bottle price, or price per glass × glasses. */
+export const checkinCost = (c: Pick<Checkin, 'price' | 'serving' | 'glasses'>) =>
+  c.price == null ? 0 : c.serving === 'glass' ? c.price * (c.glasses || 1) : c.price
+
+export const servingLabel = (c: Pick<Checkin, 'serving' | 'glasses'>) =>
+  c.serving === 'glass' ? ((c.glasses ?? 1) > 1 ? `${c.glasses} glasses` : 'A glass') : ''
 
 export const snapOf = (w: Wine, fallbackPhoto = ''): WineSnap => ({
   id: w.id,

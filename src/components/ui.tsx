@@ -100,7 +100,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={title}>
       <div className="absolute inset-0 bg-wine-900/50" onClick={onClose} />
-      <div className="fade-in relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-cream p-5 safe-bottom sm:rounded-3xl">
+      <div className="fade-in relative max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl bg-cream p-5 pb-[calc(2rem+env(safe-area-inset-bottom))] sm:rounded-3xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">{title}</h2>
           <button onClick={onClose} aria-label="Close" className="btn btn-ghost !p-2"><X size={20} /></button>

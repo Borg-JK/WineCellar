@@ -13,9 +13,9 @@ export function Layout() {
     <div className="mx-auto flex min-h-full max-w-xl flex-col">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-cream/90 px-4 py-3 backdrop-blur">
         <Link to="/" className="font-display text-2xl font-bold tracking-tight text-wine-700">WineCellar</Link>
-        <Link to="/friends" aria-label="Friends" className="relative rounded-full p-2 text-wine-700 hover:bg-wine-50">
-          <Users size={22} />
-          {pending > 0 && <span className="absolute right-0 top-0 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-wine-600 px-1 text-[10px] font-bold text-white">{pending}</span>}
+        <Link to="/friends" className="relative inline-flex items-center gap-1.5 rounded-full bg-wine-50 px-3 py-1.5 text-sm font-semibold text-wine-700 hover:bg-wine-100">
+          <Users size={18} /> Friends
+          {pending > 0 && <span aria-label={`${pending} friend request${pending > 1 ? 's' : ''}`} className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-wine-600 px-1 text-[10px] font-bold text-white">{pending}</span>}
         </Link>
       </header>
       <main className="flex-1 px-4 pb-28"><Outlet /></main>

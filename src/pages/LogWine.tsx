@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Lock, RotateCcw } from 'lucide-react'
+import { GlassWater, Lock, Minus, Plus, RotateCcw, Wine as WineIcon } from 'lucide-react'
 import { createCheckin } from '../lib/db'
-import { FLAVOUR_TAGS, OCCASIONS } from '../lib/types'
+import { FLAVOUR_TAGS, OCCASIONS, type Serving } from '../lib/types'
 import { cx, errMsg, today } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { WineSearch } from './Explore'
@@ -38,6 +38,9 @@ export function LogWine() {
     price: fromCellar?.price != null ? String(fromCellar.price) : '',
     notes: '', occasion: '', pairing: '', location: '',
   })
+  const [serving, setServing] = useState<Serving>('bottle')
+  const [glasses, setGlasses] = useState(1)
+  const byGlass = serving === 'glass' && !fromCellar
   const [tags, setTags] = useState<string[]>([])
   const [withUids, setWithUids] = useState<string[]>([])
   const [buyAgain, setBuyAgain] = useState(false)
@@ -63,8 +66,9 @@ export function LogWine() {
         me, wine, friendIds, bottleFiles: bottle, momentFiles: moments, fromCellar,
         input: {
           rating, vintage: f.vintage && !isNaN(vintage) ? vintage : null, drankAt: f.drankAt,
-          storeId: store?.id ?? '', storeName: store?.name ?? f.storeName.trim(),
+          storeId: byGlass ? '' : store?.id ?? '', storeName: byGlass ? '' : store?.name ?? f.storeName.trim(),
           price: f.price && !isNaN(price) ? price : null,
+          serving: byGlass ? 'glass' : 'bottle', glasses: byGlass ? glasses : null,
           notes: f.notes.trim(), tags, occasion: f.occasion, pairing: f.pairing.trim(), location: f.location.trim(),
           withUids, withNames: withUids.map((u) => people.get(u)?.displayName ?? '').filter(Boolean),
           buyAgain, private: isPrivate,
@@ -77,7 +81,30 @@ export function LogWine() {
   return (
     <form onSubmit={submit} className="space-y-5">
       <WineRow wine={wine} right={<Link to="/log" className="text-sm font-semibold text-wine-700">Change</Link>} />
-      {fromCellar && <p className="rounded-xl bg-wine-50 px-3.5 py-2.5 text-sm text-wine-800">Opening a bottle from your cellar. It will be taken off your stock.</p>}
+      {fromCellar ? (
+        <p className="rounded-xl bg-wine-50 px-3.5 py-2.5 text-sm text-wine-800">Opening a bottle from your cellar. It will be taken off your stock.</p>
+      ) : (
+        <div>
+          <span className="label">How did you drink it?</span>
+          <div className="flex items-center gap-2">
+            <div className="flex flex-1 rounded-full bg-sand p-1" role="radiogroup" aria-label="Serving">
+              {([['bottle', 'Bottle', WineIcon], ['glass', 'By the glass', GlassWater]] as const).map(([v, label, Icon]) => (
+                <button type="button" key={v} role="radio" aria-checked={serving === v} onClick={() => setServing(v)}
+                  className={cx('flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold transition', serving === v ? 'bg-white text-wine-800 shadow-sm' : 'text-ink/55')}>
+                  <Icon size={16} /> {label}
+                </button>
+              ))}
+            </div>
+            {byGlass && (
+              <div className="flex items-center rounded-full border border-sand bg-white" aria-label="Number of glasses">
+                <button type="button" aria-label="One glass less" className="p-2 text-ink/60 disabled:opacity-30" disabled={glasses <= 1} onClick={() => setGlasses(glasses - 1)}><Minus size={16} /></button>
+                <span className="w-6 text-center text-sm font-semibold tabular-nums" aria-live="polite">{glasses}</span>
+                <button type="button" aria-label="One glass more" className="p-2 text-ink/60" onClick={() => setGlasses(Math.min(20, glasses + 1))}><Plus size={16} /></button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <div><span className="label">Your rating</span><StarInput value={rating} onChange={setRating} /></div>
 
@@ -106,11 +133,15 @@ export function LogWine() {
       <div className="grid grid-cols-2 gap-3">
         <Field label="Vintage"><input className="input" type="number" inputMode="numeric" placeholder="e.g. 2022" value={f.vintage} onChange={set('vintage')} /></Field>
         <Field label="Date"><input className="input" type="date" value={f.drankAt} max={today()} onChange={set('drankAt')} /></Field>
-        <Field label="Bought at">
-          <input className="input" list="log-stores" placeholder="Store" value={f.storeName} onChange={set('storeName')} />
-          <datalist id="log-stores">{stores.map((s) => <option key={s.id} value={s.name} />)}</datalist>
-        </Field>
-        <Field label="Price (€)"><input className="input" inputMode="decimal" placeholder="0,00" value={f.price} onChange={set('price')} /></Field>
+        {byGlass ? (
+          <Field label="Bar or restaurant"><input className="input" placeholder="e.g. Café de Witte Aap" value={f.location} onChange={set('location')} /></Field>
+        ) : (
+          <Field label="Bought at">
+            <input className="input" list="log-stores" placeholder="Store" value={f.storeName} onChange={set('storeName')} />
+            <datalist id="log-stores">{stores.map((s) => <option key={s.id} value={s.name} />)}</datalist>
+          </Field>
+        )}
+        <Field label={byGlass ? 'Price per glass (€)' : 'Price (€)'}><input className="input" inputMode="decimal" placeholder="0,00" value={f.price} onChange={set('price')} /></Field>
       </div>
 
       <div>
@@ -121,7 +152,7 @@ export function LogWine() {
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Paired with"><input className="input" placeholder="e.g. Risotto" value={f.pairing} onChange={set('pairing')} /></Field>
-        <Field label="Where"><input className="input" placeholder="e.g. Home, Kralingen" value={f.location} onChange={set('location')} /></Field>
+        {!byGlass && <Field label="Where"><input className="input" placeholder="e.g. Home, Kralingen" value={f.location} onChange={set('location')} /></Field>}
       </div>
 
       {friendIds.length > 0 && (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Check, Search, UserPlus, Users, X } from 'lucide-react'
+import { Check, Search, Share2, UserPlus, Users, X } from 'lucide-react'
 import { acceptFriendRequest, friendshipId, removeFriendship, searchUsers, sendFriendRequest } from '../lib/db'
 import type { Friendship, UserProfile } from '../lib/types'
 import { errMsg } from '../lib/util'
@@ -37,6 +37,26 @@ export function FriendButton({ other }: { other: string }) {
   )
 }
 
+/** Share a link to my profile; whoever opens it can send me a request in one tap. */
+function InviteButton() {
+  const me = useMe()
+  const [copied, setCopied] = useState(false)
+  const invite = async () => {
+    const url = `${window.location.origin}/u/${me.id}`
+    const text = `Add me on WineCellar, I'm @${me.username}`
+    try {
+      if (navigator.share) return await navigator.share({ title: 'WineCellar', text, url })
+      await navigator.clipboard.writeText(`${text}: ${url}`)
+      setCopied(true); setTimeout(() => setCopied(false), 2500)
+    } catch { /* share sheet closed */ }
+  }
+  return (
+    <button type="button" className="btn btn-soft w-full" onClick={invite}>
+      <Share2 size={17} /> {copied ? 'Link copied' : 'Invite friends with a link'}
+    </button>
+  )
+}
+
 export function Friends() {
   const me = useMe()
   const { friendships, friendIds, people } = useApp()
@@ -60,11 +80,12 @@ export function Friends() {
         <h1 className="text-2xl font-semibold">Friends</h1>
         <div className="relative">
           <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/40" />
-          <input className="input !pl-10" type="search" autoCapitalize="none" placeholder="Search by username" value={q} onChange={(e) => setQ(e.target.value)} />
+          <input className="input !pl-10" type="search" autoCapitalize="none" placeholder="Search by name or @username" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         {results.map((p) => <Person key={p.id} p={p}><FriendButton other={p.id} /></Person>)}
-        {searched && results.length === 0 && <p className="px-1 text-sm text-ink/55">Nobody with that username. Usernames start with what you type.</p>}
-        <p className="px-1 text-xs text-ink/50">Your username is <b>@{me.username}</b> — share it so friends can find you.</p>
+        {searched && results.length === 0 && <p className="px-1 text-sm text-ink/55">Nobody found. Try the start of their name or username, or send them an invite link.</p>}
+        <InviteButton />
+        <p className="px-1 text-xs text-ink/50">Your username is <b>@{me.username}</b>. Friends can also search for that.</p>
       </section>
 
       {incoming.length > 0 && (

@@ -1,4 +1,5 @@
-import type { CellarItem, Checkin, Wine, WineType } from './types'
+import { WINE_TYPES, type CellarItem, type Checkin, type Wine, type WineType } from './types'
+import { checkinCost, isBubbly } from './util'
 
 export interface Stats {
   total: number
@@ -26,7 +27,7 @@ export function computeStats(checkins: Checkin[], wines: Map<string, Wine>): Sta
     bump(stores, c.storeName)
     for (const g of wines.get(c.wineId)?.grapes ?? []) bump(grapes, g)
     if (c.rating > 0) { sum += c.rating; rated++ }
-    if (c.price) spent += c.price
+    spent += checkinCost(c)
     if (c.rating > 0 && (!best || c.rating > best.rating)) best = c
   }
   return {
@@ -34,7 +35,7 @@ export function computeStats(checkins: Checkin[], wines: Map<string, Wine>): Sta
     uniqueWines: new Set(checkins.map((c) => c.wineId)).size,
     avg: rated ? sum / rated : 0,
     spent,
-    byType: top(types, 7) as [WineType, number][],
+    byType: top(types, WINE_TYPES.length) as [WineType, number][],
     topGrapes: top(grapes),
     topCountries: top(countries),
     topStores: top(stores, 3),
@@ -48,12 +49,12 @@ export function computeBadges(checkins: Checkin[], wines: Map<string, Wine>, fri
   const n = checkins.length
   const countries = new Set(checkins.map((c) => c.wine.country).filter(Boolean)).size
   const grapes = new Set(checkins.flatMap((c) => wines.get(c.wineId)?.grapes ?? [])).size
-  const types = new Set(checkins.map((c) => c.wine.type))
-  const colours = ['red', 'white', 'rosé', 'sparkling'].filter((t) => types.has(t as WineType)).length
+  const types = new Set<string>(checkins.map((c) => (isBubbly(c.wine.type) ? 'sparkling' : c.wine.type)))
+  const colours = ['red', 'white', 'rosé', 'sparkling'].filter((t) => types.has(t)).length
   const notes = checkins.filter((c) => c.notes.trim().length >= 20).length
   const moments = checkins.filter((c) => c.momentPhotos.length > 0).length
   const stores = new Set(checkins.map((c) => c.storeName).filter(Boolean)).size
-  const bubbles = checkins.filter((c) => c.wine.type === 'sparkling').length
+  const bubbles = checkins.filter((c) => isBubbly(c.wine.type)).length
   const shared = checkins.filter((c) => c.withUids.length > 0).length
   const bottles = cellar?.reduce((s, i) => s + i.quantity, 0) ?? 0
   const b = (id: string, emoji: string, name: string, how: string, have: number, need: number): Badge =>
@@ -64,11 +65,11 @@ export function computeBadges(checkins: Checkin[], wines: Map<string, Wine>, fri
     b('fifty', '🎓', 'Sommelier in training', 'Log 50 wines', n, 50),
     b('globe', '🌍', 'Globetrotter', 'Drink wines from 5 countries', countries, 5),
     b('grapes', '🍇', 'Grape explorer', 'Try 10 different grapes', grapes, 10),
-    b('colours', '🌈', 'Full spectrum', 'Log a red, white, rosé and sparkling', colours, 4),
+    b('colours', '🌈', 'Full spectrum', 'Log a red, white, rosé and a bubbly', colours, 4),
     b('critic', '✍️', 'Critic', 'Write 10 proper tasting notes', notes, 10),
     b('moments', '📸', 'Moment keeper', 'Add moment photos to 5 check-ins', moments, 5),
     b('local', '🛍️', 'Local hero', 'Buy from 5 different stores', stores, 5),
-    b('bubbles', '🍾', 'Bubbles', 'Log 3 sparkling wines', bubbles, 3),
+    b('bubbles', '🍾', 'Bubbles', 'Log 3 sparkling wines or champagnes', bubbles, 3),
     b('together', '🫶', 'Better together', 'Tag friends in 5 check-ins', shared, 5),
     b('social', '👋', 'Good company', 'Have 3 friends', friendCount, 3),
   ]
