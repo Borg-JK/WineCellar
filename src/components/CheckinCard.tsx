@@ -7,7 +7,7 @@ import { addComment, deleteCheckin, deleteComment, read, toggleCheers } from '..
 import type { Checkin, Comment } from '../lib/types'
 import { cx, euro, servingLabel, timeAgo } from '../lib/util'
 import { useMe } from '../state/AppContext'
-import { Avatar, BottleImage, Lightbox, Stars, TypeDot } from './ui'
+import { Avatar, BottleImage, Lightbox, Score, TypeDot } from './ui'
 
 export function CheckinCard({ c }: { c: Checkin }) {
   const me = useMe()
@@ -56,7 +56,7 @@ export function CheckinCard({ c }: { c: Checkin }) {
           <p className="mt-0.5 flex items-center gap-1.5 text-xs capitalize text-ink/60">
             <TypeDot type={c.wine.type} /> {c.wine.type}{c.wine.country && ` · ${c.wine.country}`}
           </p>
-          {c.rating > 0 && <p className="mt-1 flex items-center gap-1.5 text-sm font-semibold text-wine-700"><Stars value={c.rating} /> {c.rating.toFixed(1)}</p>}
+          {c.rating > 0 && <p className="mt-1.5"><Score value={c.rating} /></p>}
         </div>
       </Link>
 

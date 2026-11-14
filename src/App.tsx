@@ -13,6 +13,7 @@ import { Cellar } from './pages/Cellar'
 import { Friends } from './pages/Friends'
 import { Profile } from './pages/Profile'
 import { StoreDetail } from './pages/StoreDetail'
+import { ProducerDetail } from './pages/ProducerDetail'
 
 function Gate() {
   const { user, authReady, profile } = useApp()
@@ -35,6 +36,7 @@ function Gate() {
         <Route path="profile" element={<Profile />} />
         <Route path="u/:uid" element={<Profile />} />
         <Route path="stores/:id" element={<StoreDetail />} />
+        <Route path="producers/:id" element={<ProducerDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

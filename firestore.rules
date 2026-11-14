@@ -56,6 +56,13 @@ service cloud.firestore {
       );
     }
 
+    // Producers: anyone signed in can add one; only the person who added it can change it.
+    match /producers/{id} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow update, delete: if signedIn() && resource.data.createdBy == request.auth.uid;
+    }
+
     match /stores/{id} {
       allow read: if signedIn();
       allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;

@@ -91,7 +91,23 @@ export async function ensureWine(wine: Wine, uid: string) {
   await setDoc(r, { ...data, createdBy: uid, createdAt: serverTimestamp() })
 }
 
-export type NewWine = Pick<Wine, 'name' | 'producer' | 'type' | 'grapes' | 'country' | 'region' | 'abv' | 'organic' | 'storeIds'>
+export type NewWine = Pick<Wine, 'name' | 'producer' | 'producerId' | 'type' | 'grapes' | 'country' | 'region' | 'abv' | 'organic' | 'storeIds'>
+
+/** Save a producer that is not on the list yet, so it can be picked for the next wine. Returns its id. */
+export async function ensureProducer(uid: string, name: string, country: string, region: string) {
+  const id = slug(name)
+  if (!id) return ''
+  const r = doc(db, 'producers', id)
+  try {
+    if (!(await getDoc(r)).exists()) {
+      await setDoc(r, { name: name.trim(), country, region, createdBy: uid, createdAt: serverTimestamp() })
+    }
+  } catch (e) {
+    // Never block saving the wine over this; the producer still shows up through the wine itself.
+    console.warn('[producer] not saved:', (e as Error).message)
+  }
+  return id
+}
 
 export async function createWine(uid: string, data: NewWine, bottleFiles: File[]): Promise<Wine> {
   const r = doc(collection(db, 'wines'))

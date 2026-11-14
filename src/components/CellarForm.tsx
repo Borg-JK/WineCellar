@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import type { CellarInput, CellarItem } from '../lib/types'
 import { errMsg, today } from '../lib/util'
 import { useApp } from '../state/AppContext'
@@ -6,7 +6,8 @@ import { ErrorNote, Field, Spinner } from './ui'
 
 const num = (s: string) => (s.trim() === '' || isNaN(Number(s.replace(',', '.'))) ? null : Number(s.replace(',', '.')))
 
-export function CellarForm({ initial, onSubmit, submitLabel }: { initial?: CellarItem; onSubmit: (v: CellarInput) => Promise<void>; submitLabel: string }) {
+/** Bottle details for the cellar. `children` render at the top of the same form (used to add a new wine in one go). */
+export function CellarForm({ initial, onSubmit, submitLabel, children }: { initial?: CellarItem; onSubmit: (v: CellarInput) => Promise<void>; submitLabel: string; children?: ReactNode }) {
   const { stores } = useApp()
   const [f, setF] = useState({
     quantity: String(initial?.quantity ?? 1),
@@ -25,6 +26,8 @@ export function CellarForm({ initial, onSubmit, submitLabel }: { initial?: Cella
 
   const submit = async (e: FormEvent) => {
     e.preventDefault()
+    const year = num(f.vintage)
+    if (year != null && (year < 1900 || year > new Date().getFullYear() + 1)) return setError('That year looks off. Use four digits, e.g. 2019.')
     setBusy(true); setError('')
     try {
       await onSubmit({
@@ -37,9 +40,11 @@ export function CellarForm({ initial, onSubmit, submitLabel }: { initial?: Cella
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {children}
+      {children && <h3 className="pt-2 text-lg font-semibold">Your bottles</h3>}
       <div className="grid grid-cols-2 gap-3">
         <Field label="Bottles"><input className="input" type="number" min={1} inputMode="numeric" value={f.quantity} onChange={set('quantity')} required /></Field>
-        <Field label="Vintage"><input className="input" type="number" inputMode="numeric" placeholder="e.g. 2022" value={f.vintage} onChange={set('vintage')} /></Field>
+        <Field label="Year (vintage)"><input className="input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="e.g. 2019" value={f.vintage} onChange={set('vintage')} /></Field>
         <Field label="Bought at">
           <input className="input" list="store-names" placeholder="Store" value={f.storeName} onChange={set('storeName')} />
           <datalist id="store-names">{stores.map((s) => <option key={s.id} value={s.name} />)}</datalist>

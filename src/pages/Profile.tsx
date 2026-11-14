@@ -6,11 +6,12 @@ import { Camera, LogOut, Pencil, Users, Wine as WineIcon } from 'lucide-react'
 import { auth, db } from '../lib/firebase'
 import { getProfile, read, updateProfileDoc, uploadAvatar } from '../lib/db'
 import { computeBadges, computeStats } from '../lib/stats'
-import type { Checkin, UserProfile } from '../lib/types'
-import { cx, errMsg, euro, TYPE_COLOUR } from '../lib/util'
+import type { Checkin, UserProfile, Wine, WineSnap } from '../lib/types'
+import { cx, errMsg, euro, fmtScore, TYPE_COLOUR } from '../lib/util'
 import { checkinDefaults, useApp, useMe } from '../state/AppContext'
 import { CheckinCard } from '../components/CheckinCard'
-import { Avatar, Empty, ErrorNote, Field, FullSpinner, Sheet, Spinner, Stars, Tabs } from '../components/ui'
+import { WineRow } from '../components/WineCard'
+import { Avatar, Empty, ErrorNote, Field, FullSpinner, Sheet, Spinner, Score, Tabs } from '../components/ui'
 import { FriendButton } from './Friends'
 
 export function Profile() {
@@ -22,7 +23,7 @@ export function Profile() {
 
   const [other, setOther] = useState<UserProfile | null | undefined>(undefined)
   const [theirs, setTheirs] = useState<Checkin[] | null>(null)
-  const [tab, setTab] = useState<'activity' | 'stats' | 'badges'>('activity')
+  const [tab, setTab] = useState<'activity' | 'wines' | 'stats' | 'badges'>('activity')
   const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => {
@@ -69,9 +70,9 @@ export function Profile() {
       </div>
       {isMe ? (
         <div className="flex gap-2">
-          <button className="btn btn-outline flex-1" onClick={() => setEditOpen(true)}><Pencil size={16} /> Edit profile</button>
-          <Link to="/friends" className="btn btn-outline"><Users size={16} /> {friendIds.length}</Link>
-          <button className="btn btn-ghost" onClick={() => signOut(auth)}><LogOut size={16} /> Log out</button>
+          <button className="btn btn-outline flex-1 whitespace-nowrap" onClick={() => setEditOpen(true)}><Pencil size={16} /> Edit profile</button>
+          <Link to="/friends" aria-label={`Friends: ${friendIds.length}`} className="btn btn-outline whitespace-nowrap"><Users size={16} /> {friendIds.length}</Link>
+          <button className="btn btn-ghost !px-3" aria-label="Log out" title="Log out" onClick={() => signOut(auth)}><LogOut size={18} /></button>
         </div>
       ) : <FriendButton other={person.id} />}
 
@@ -80,15 +81,17 @@ export function Profile() {
       ) : (
         <>
           <div className="grid grid-cols-4 gap-2 text-center">
-            {[[stats.total, 'check-ins'], [stats.uniqueWines, 'wines'], [stats.avg ? stats.avg.toFixed(1) : '–', 'avg rating'], [badges.filter((b) => b.earned).length, 'badges']].map(([n, l]) => (
+            {[[stats.total, 'check-ins'], [stats.uniqueWines, 'wines'], [stats.avg ? `${fmtScore(stats.avg)}` : '–', 'avg /10'], [badges.filter((b) => b.earned).length, 'badges']].map(([n, l]) => (
               <div key={l} className="card px-1 py-3"><p className="font-display text-xl font-semibold text-wine-700">{n}</p><p className="text-[11px] text-ink/55">{l}</p></div>
             ))}
           </div>
-          <Tabs value={tab} onChange={setTab} options={[{ id: 'activity', label: 'Activity' }, { id: 'stats', label: 'Taste' }, { id: 'badges', label: 'Badges' }]} />
+          <Tabs value={tab} onChange={setTab} options={[{ id: 'activity', label: 'Activity' }, { id: 'wines', label: 'Wines' }, { id: 'stats', label: 'Taste' }, { id: 'badges', label: 'Badges' }]} />
 
           {tab === 'activity' && (checkins.length === 0
             ? <Empty icon={<WineIcon size={26} />} title="No check-ins yet" />
             : <div className="space-y-4">{checkins.slice(0, 50).map((c) => <CheckinCard key={c.id} c={c} />)}</div>)}
+
+          {tab === 'wines' && <TastedWines checkins={checkins} isMe={isMe} />}
 
           {tab === 'stats' && (stats.total === 0 ? <Empty icon={<WineIcon size={26} />} title="Log a few wines first">Your taste profile builds itself from your check-ins.</Empty> : (
             <div className="space-y-4">
@@ -111,7 +114,7 @@ export function Profile() {
                 <section className="card p-4">
                   <h2 className="text-lg font-semibold">Highest rated</h2>
                   <p className="mt-1 text-sm">{stats.best.wine.producer} {stats.best.wine.name}</p>
-                  <p className="mt-1 flex items-center gap-2 text-sm font-semibold text-wine-700"><Stars value={stats.best.rating} /> {stats.best.rating.toFixed(1)}</p>
+                  <p className="mt-1.5"><Score value={stats.best.rating} /></p>
                 </section>
               )}
               {isMe && stats.spent > 0 && <p className="px-1 text-sm text-ink/60">Total spent on logged bottles: <b className="text-ink">{euro(stats.spent)}</b></p>}
@@ -133,6 +136,64 @@ export function Profile() {
         </>
       )}
       {isMe && <EditProfile open={editOpen} onClose={() => setEditOpen(false)} />}
+    </div>
+  )
+}
+
+type WineSort = 'recent' | 'rating' | 'count' | 'name'
+
+/** Every wine in these check-ins once, with how often, how good and when last. */
+function TastedWines({ checkins, isMe }: { checkins: Checkin[]; isMe: boolean }) {
+  const { wineMap } = useApp()
+  const [sort, setSort] = useState<WineSort>('recent')
+  const [q, setQ] = useState('')
+  const rows = useMemo(() => {
+    const m = new Map<string, { wine: Wine | WineSnap; times: number; rated: number; sum: number; best: number; last: string; glass: number }>()
+    for (const c of checkins) {
+      const r = m.get(c.wineId) ?? { wine: wineMap.get(c.wineId) ?? c.wine, times: 0, rated: 0, sum: 0, best: 0, last: '', glass: 0 }
+      r.times++
+      if (c.rating > 0) { r.rated++; r.sum += c.rating; r.best = Math.max(r.best, c.rating) }
+      const when = c.drankAt || new Date(c.createdAt).toISOString().slice(0, 10)
+      if (when > r.last) r.last = when
+      if (c.serving === 'glass') r.glass++
+      m.set(c.wineId, r)
+    }
+    const avg = (r: { rated: number; sum: number }) => (r.rated ? r.sum / r.rated : 0)
+    const list = [...m.entries()].map(([id, r]) => ({ id, ...r, avg: avg(r) }))
+    const needle = q.trim().toLowerCase()
+    const shown = needle ? list.filter((r) => `${r.wine.producer} ${r.wine.name} ${r.wine.type} ${r.wine.country}`.toLowerCase().includes(needle)) : list
+    const by: Record<WineSort, (a: typeof list[number], b: typeof list[number]) => number> = {
+      recent: (a, b) => b.last.localeCompare(a.last),
+      rating: (a, b) => b.avg - a.avg || b.times - a.times,
+      count: (a, b) => b.times - a.times || b.last.localeCompare(a.last),
+      name: (a, b) => `${a.wine.producer} ${a.wine.name}`.localeCompare(`${b.wine.producer} ${b.wine.name}`),
+    }
+    return { total: list.length, shown: shown.sort(by[sort]) }
+  }, [checkins, wineMap, sort, q])
+
+  if (rows.total === 0) return <Empty icon={<WineIcon size={26} />} title="No wines yet">{isMe ? 'Every wine you log shows up here.' : 'Nothing logged yet.'}</Empty>
+  const date = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <input className="input flex-1" type="search" placeholder={`Search ${rows.total} wine${rows.total === 1 ? '' : 's'}`} value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className="input !w-auto" aria-label="Sort wines" value={sort} onChange={(e) => setSort(e.target.value as WineSort)}>
+          <option value="recent">Recent</option>
+          <option value="rating">Best rated</option>
+          <option value="count">Most often</option>
+          <option value="name">A–Z</option>
+        </select>
+      </div>
+      <p className="px-1 text-xs text-ink/50">{rows.total} different wine{rows.total === 1 ? '' : 's'} tasted</p>
+      {rows.shown.map((r) => (
+        <WineRow key={r.id} wine={r.wine} to={`/wines/${r.id}`} hideRating sub={
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-wine-700">
+            {r.avg > 0 && <Score value={r.avg} size="sm" />}
+            <span>{r.times}×{r.glass > 0 && r.glass === r.times ? ' by the glass' : ''}</span>
+            {r.last && <span className="text-ink/50">last {date(r.last)}</span>}
+          </p>
+        } />
+      ))}
     </div>
   )
 }

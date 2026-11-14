@@ -1,15 +1,15 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, Plus, Search, Store as StoreIcon } from 'lucide-react'
+import { ChevronRight, Factory, Plus, Search, Store as StoreIcon } from 'lucide-react'
 import { createStore } from '../lib/db'
 import { WINE_TYPES, type Store, type Wine, type WineType } from '../lib/types'
-import { cx, errMsg, matchesWine } from '../lib/util'
+import { cx, errMsg, matchesWine, producerIdOf } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { WineRow } from '../components/WineCard'
 import { ErrorNote, Field, Sheet, Spinner, Tabs } from '../components/ui'
 
 /** Search box + type and store filters over the merged catalogue. Also used as the picker on the Log page. */
-export function WineSearch({ linkTo, onPick, addLink }: { linkTo?: (id: string) => string; onPick?: (w: Wine) => void; addLink: string }) {
+export function WineSearch({ linkTo, onPick, addLink, onAdd }: { linkTo?: (id: string) => string; onPick?: (w: Wine) => void; addLink?: string; onAdd?: (typed: string) => void }) {
   const { wines, stores } = useApp()
   const [q, setQ] = useState('')
   const [type, setType] = useState<WineType | null>(null)
@@ -42,9 +42,15 @@ export function WineSearch({ linkTo, onPick, addLink }: { linkTo?: (id: string) 
         ) : <WineRow key={w.id} wine={w} to={linkTo?.(w.id)} right={<ChevronRight size={18} className="text-ink/30" />} />)}
         {results.length > 80 && <p className="px-1 text-xs text-ink/50">Showing the first 80. Type more of the name to narrow it down.</p>}
       </div>
-      <Link to={addLink} className="card flex items-center gap-3 border-dashed !border-wine-300 bg-wine-50 p-4 text-sm font-semibold text-wine-800">
-        <Plus size={20} /> Can't find it? Add the wine yourself
-      </Link>
+      {onAdd ? (
+        <button type="button" onClick={() => onAdd(q.trim())} className="card flex w-full cursor-pointer items-center gap-3 border-dashed !border-wine-300 bg-wine-50 p-4 text-left text-sm font-semibold text-wine-800">
+          <Plus size={20} /> Can't find it? Add the wine yourself
+        </button>
+      ) : addLink && (
+        <Link to={`${addLink}${addLink.includes('?') ? '&' : '?'}name=${encodeURIComponent(q.trim())}`} className="card flex items-center gap-3 border-dashed !border-wine-300 bg-wine-50 p-4 text-sm font-semibold text-wine-800">
+          <Plus size={20} /> Can't find it? Add the wine yourself
+        </Link>
+      )}
     </div>
   )
 }
@@ -102,12 +108,45 @@ function Stores() {
   )
 }
 
+function Producers() {
+  const { producers, wines } = useApp()
+  const [q, setQ] = useState('')
+  const counts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const w of wines) m.set(producerIdOf(w), (m.get(producerIdOf(w)) ?? 0) + 1)
+    return m
+  }, [wines])
+  const fold = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const shown = producers.filter((p) => fold(`${p.name} ${p.country} ${p.region}`).includes(fold(q.trim())))
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/40" />
+        <input className="input !pl-10" type="search" placeholder="Search producer, country, region…" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <p className="text-xs text-ink/50">{shown.length} producer{shown.length === 1 ? '' : 's'}</p>
+      {shown.slice(0, 100).map((p) => (
+        <Link key={p.id} to={`/producers/${p.id}`} className="card flex items-center gap-3 p-3.5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-wine-50 text-wine-600"><Factory size={20} /></div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold">{p.name}</p>
+            <p className="truncate text-xs text-ink/55">{[p.region, p.country].filter(Boolean).join(', ') || '—'}</p>
+          </div>
+          <span className="text-xs text-ink/45">{counts.get(p.id) || ''}</span>
+          <ChevronRight size={18} className="text-ink/30" />
+        </Link>
+      ))}
+      <Link to="/wines/new" className="btn btn-soft w-full"><Plus size={18} /> Add a wine (and its producer)</Link>
+    </div>
+  )
+}
+
 export function Explore() {
-  const [tab, setTab] = useState<'wines' | 'stores'>('wines')
+  const [tab, setTab] = useState<'wines' | 'producers' | 'stores'>('wines')
   return (
     <div className="space-y-4">
-      <Tabs value={tab} onChange={setTab} options={[{ id: 'wines', label: 'Wines' }, { id: 'stores', label: 'Stores' }]} />
-      {tab === 'wines' ? <WineSearch linkTo={(id) => `/wines/${id}`} addLink="/wines/new" /> : <Stores />}
+      <Tabs value={tab} onChange={setTab} options={[{ id: 'wines', label: 'Wines' }, { id: 'producers', label: 'Producers' }, { id: 'stores', label: 'Stores' }]} />
+      {tab === 'wines' ? <WineSearch linkTo={(id) => `/wines/${id}`} addLink="/wines/new" /> : tab === 'producers' ? <Producers /> : <Stores />}
     </div>
   )
 }

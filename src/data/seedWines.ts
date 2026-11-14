@@ -1,5 +1,7 @@
 import type { Wine, WineType } from '../lib/types'
 import { slug } from '../lib/util'
+import { BOTTLE_PHOTOS } from './bottlePhotos'
+import { OFF_WINES } from './offWines'
 
 /**
  * Starter catalogue. The first block is wines listed in the online ranges of
@@ -309,7 +311,7 @@ const ROWS: Row[] = [
   ['5 Year Old Malmsey Madeira', 'Blandy\'s', 'fortified', ['Malvasia'], 'Portugal', 'Madeira', []],
 ]
 
-export const SEED_WINES: Wine[] = ROWS.map(([name, producer, type, grapes, country, region, storeIds]) => ({
+const fromRows: Wine[] = ROWS.map(([name, producer, type, grapes, country, region, storeIds]) => ({
   id: `cat-${slug(`${producer} ${name}`)}`,
   name,
   producer,
@@ -324,3 +326,21 @@ export const SEED_WINES: Wine[] = ROWS.map(([name, producer, type, grapes, count
   createdBy: 'catalog',
   source: 'catalog',
 }))
+
+const known = new Set(fromRows.map((w) => w.id))
+const fromOff: Wine[] = OFF_WINES.map((o) => ({
+  id: `cat-off-${o.code}`, name: o.name, producer: o.producer, type: o.type, grapes: [], country: o.country, region: o.region,
+  photos: [], storeIds: [], ratingSum: 0, ratingCount: 0, createdBy: 'catalog', source: 'catalog' as const,
+}))
+
+export const SEED_WINES: Wine[] = [...fromRows, ...fromOff.filter((w) => !known.has(w.id))].map((w) => {
+  const off = OFF_WINES.find((o) => `cat-off-${o.code}` === w.id)
+  const photo = BOTTLE_PHOTOS[w.id]?.src ?? off?.photo
+  return photo ? { ...w, photos: [photo] } : w
+})
+
+/** Open Food Facts product page for a catalogue photo, for the licence credit. */
+export function photoCredit(wineId: string): string | null {
+  const code = BOTTLE_PHOTOS[wineId]?.code ?? (wineId.startsWith('cat-off-') ? wineId.slice(8) : null)
+  return code ? `https://world.openfoodfacts.org/product/${code}` : null
+}

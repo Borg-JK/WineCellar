@@ -1,7 +1,7 @@
 import { useEffect, type ReactNode } from 'react'
-import { Star, Wine as WineIcon, X, Loader2 } from 'lucide-react'
+import { Wine as WineIcon, X, Loader2 } from 'lucide-react'
 import type { WineType } from '../lib/types'
-import { cx, TYPE_COLOUR } from '../lib/util'
+import { cx, fmtScore, fromTen, toTen, TYPE_COLOUR } from '../lib/util'
 
 export function Avatar({ src, name, size = 40 }: { src?: string; name: string; size?: number }) {
   const style = { width: size, height: size, fontSize: size * 0.4 }
@@ -14,46 +14,34 @@ export function Avatar({ src, name, size = 40 }: { src?: string; name: string; s
   )
 }
 
-/** Read-only stars, supports halves. */
-export function Stars({ value, size = 16 }: { value: number; size?: number }) {
+/** A rating shown as a score out of 10, e.g. "8.5/10". Takes the stored 0.5–5 value. */
+export function Score({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' }) {
   return (
-    <span className="inline-flex" aria-label={`${value} out of 5`}>
-      {[1, 2, 3, 4, 5].map((i) => {
-        const fill = Math.max(0, Math.min(1, value - (i - 1)))
-        return (
-          <span key={i} className="relative" style={{ width: size, height: size }}>
-            <Star size={size} className="absolute text-sand" fill="currentColor" strokeWidth={0} />
-            <span className="absolute overflow-hidden" style={{ width: `${fill * 100}%` }}>
-              <Star size={size} className="text-gold" fill="currentColor" strokeWidth={0} />
-            </span>
-          </span>
-        )
-      })}
+    <span aria-label={`${fmtScore(value)} out of 10`}
+      className={cx('inline-flex items-baseline rounded-md bg-wine-700 font-semibold tabular-nums text-cream', size === 'sm' ? 'px-1 text-[11px]' : 'px-1.5 py-px text-sm')}>
+      {fmtScore(value)}<span className="ml-px text-[0.75em] font-medium opacity-70">/10</span>
     </span>
   )
 }
 
-/** Tap the left or right half of a star for half points. */
-export function StarInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+/** Pick a score from 1 to 10; tap the chosen one again to clear it. Reports the stored 0.5–5 value. */
+export function ScoreInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const current = toTen(value)
   return (
-    <div className="flex items-center gap-3">
-      <div className="flex">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <span key={i} className="relative h-11 w-11">
-            <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <span className="relative h-9 w-9">
-                <Star size={36} className="absolute text-sand" fill="currentColor" strokeWidth={0} />
-                <span className="absolute overflow-hidden" style={{ width: `${Math.max(0, Math.min(1, value - (i - 1))) * 100}%` }}>
-                  <Star size={36} className="text-gold" fill="currentColor" strokeWidth={0} />
-                </span>
-              </span>
-            </span>
-            <button type="button" aria-label={`${i - 0.5} stars`} className="absolute inset-y-0 left-0 w-1/2 cursor-pointer" onClick={() => onChange(value === i - 0.5 ? 0 : i - 0.5)} />
-            <button type="button" aria-label={`${i} stars`} className="absolute inset-y-0 right-0 w-1/2 cursor-pointer" onClick={() => onChange(value === i ? 0 : i)} />
-          </span>
+    <div>
+      <div className="grid grid-cols-10 gap-1" role="radiogroup" aria-label="Score out of 10">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={current === n} aria-label={`${n} out of 10`}
+            onClick={() => onChange(current === n ? 0 : fromTen(n))}
+            className={cx('h-11 cursor-pointer rounded-lg text-[15px] font-semibold tabular-nums transition',
+              n <= current ? 'bg-wine-700 text-cream' : 'border border-sand bg-white text-ink/60')}>
+            {n}
+          </button>
         ))}
       </div>
-      <span className="font-display text-2xl font-semibold tabular-nums text-wine-700">{value ? value.toFixed(1) : '–'}</span>
+      <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-wine-700">
+        {value ? <>{current}<span className="text-base text-ink/45">/10</span></> : <span className="text-base font-normal text-ink/45">Tap a score</span>}
+      </p>
     </div>
   )
 }

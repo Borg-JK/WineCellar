@@ -5,6 +5,8 @@ export interface Wine {
   id: string
   name: string
   producer: string
+  /** Slug of the producer's name; also the id of its `producers` doc. Older wines derive it from `producer`. */
+  producerId?: string
   type: WineType
   grapes: string[]
   country: string
@@ -27,6 +29,15 @@ export interface WineSnap {
   type: WineType
   country: string
   photo: string
+}
+
+export interface Producer {
+  id: string
+  name: string
+  country: string
+  region: string
+  createdBy?: string
+  source: 'catalog' | 'user'
 }
 
 export interface Store {

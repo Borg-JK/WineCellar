@@ -12,13 +12,15 @@ import { ErrorNote, Field, Spinner } from '../components/ui'
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-full flex-col items-center justify-center bg-wine-800 px-5 py-10">
+    <div className="h-full overflow-y-auto bg-wine-800">
+    <div className="flex min-h-full flex-col items-center justify-center px-5 py-10">
       <div className="mb-8 text-center text-cream">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-cream/10"><WineIcon size={34} strokeWidth={1.5} /></div>
         <h1 className="text-4xl font-bold tracking-tight">WineCellar</h1>
         <p className="mt-2 text-sm text-wine-200">Remember every bottle. Share it with friends.</p>
       </div>
       <div className="w-full max-w-sm rounded-3xl bg-cream p-6 shadow-2xl">{children}</div>
+    </div>
     </div>
   )
 }

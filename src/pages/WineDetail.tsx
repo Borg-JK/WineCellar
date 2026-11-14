@@ -2,11 +2,12 @@ import { useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bookmark, Camera, Leaf, Pencil, Plus, Warehouse } from 'lucide-react'
 import { addBottlePhotos, addToCellar, toggleWishlist } from '../lib/db'
-import { avgRating, cx, errMsg } from '../lib/util'
+import { avgRating, cx, errMsg, fmtScore, producerIdOf } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { CellarForm } from '../components/CellarForm'
+import { photoCredit } from '../data/seedWines'
 import { CheckinCard } from '../components/CheckinCard'
-import { BottleImage, Empty, Lightbox, Sheet, Spinner, Stars, TypeDot } from '../components/ui'
+import { BottleImage, Empty, Lightbox, Sheet, Spinner, Score, TypeDot } from '../components/ui'
 
 export function WineDetail() {
   const { id = '' } = useParams()
@@ -46,14 +47,19 @@ export function WineDetail() {
         ))}
       </div>
 
+      {wine.photos.some((p) => p.startsWith('/bottles/')) && photoCredit(wine.id) && (
+        <p className="-mt-3 text-right text-[11px] text-ink/40">
+          Bottle photo: <a href={photoCredit(wine.id)!} target="_blank" rel="noreferrer" className="underline">Open Food Facts</a>, CC BY-SA
+        </p>
+      )}
       <div>
-        <p className="text-sm font-medium uppercase tracking-wide text-ink/50">{wine.producer}</p>
+        <Link to={`/producers/${producerIdOf(wine)}`} className="text-sm font-medium uppercase tracking-wide text-ink/50 underline decoration-sand underline-offset-4">{wine.producer}</Link>
         <h1 className="text-3xl font-semibold leading-tight">{wine.name}</h1>
         <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink/65">
           <span className="inline-flex items-center gap-1.5 capitalize"><TypeDot type={wine.type} /> {wine.type}</span>
           {wine.organic && <span className="inline-flex items-center gap-1 text-green-700"><Leaf size={14} /> Organic</span>}
           {wine.ratingCount > 0
-            ? <span className="inline-flex items-center gap-1.5"><Stars value={avgRating(wine)} /> <b className="text-ink">{avgRating(wine).toFixed(1)}</b> ({wine.ratingCount})</span>
+            ? <span className="inline-flex items-center gap-1.5"><Score value={avgRating(wine)} /> <span>from {wine.ratingCount} rating{wine.ratingCount === 1 ? '' : 's'}</span></span>
             : <span>No ratings yet</span>}
         </div>
       </div>
@@ -87,7 +93,7 @@ export function WineDetail() {
       {mine.length > 0 && (
         <section className="space-y-3">
           <h2 className="text-lg font-semibold">
-            Your check-ins <span className="text-sm font-normal text-ink/50">· {mine.length}×{myAvg.length > 0 && `, avg ${(myAvg.reduce((s, c) => s + c.rating, 0) / myAvg.length).toFixed(1)}`}</span>
+            Your check-ins <span className="text-sm font-normal text-ink/50">· {mine.length}×{myAvg.length > 0 && `, avg ${fmtScore(myAvg.reduce((s, c) => s + c.rating, 0) / myAvg.length)}/10`}</span>
           </h2>
           {mine.map((c) => <CheckinCard key={c.id} c={c} />)}
         </section>

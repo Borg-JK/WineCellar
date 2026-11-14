@@ -8,7 +8,7 @@ import { useApp, useMe } from '../state/AppContext'
 import { WineSearch } from './Explore'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { WineRow } from '../components/WineCard'
-import { Avatar, ErrorNote, Field, Spinner, StarInput } from '../components/ui'
+import { Avatar, ErrorNote, Field, Spinner, ScoreInput } from '../components/ui'
 
 /** Step 1: choose the wine. */
 export function LogPick() {
@@ -106,7 +106,7 @@ export function LogWine() {
         </div>
       )}
 
-      <div><span className="label">Your rating</span><StarInput value={rating} onChange={setRating} /></div>
+      <div><span className="label">Your score</span><ScoreInput value={rating} onChange={setRating} /></div>
 
       <Field label="Tasting notes">
         <textarea className="input min-h-24" placeholder="What did it taste like? Would you serve it again?" value={f.notes} onChange={set('notes')} maxLength={2000} />
@@ -131,7 +131,7 @@ export function LogWine() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Vintage"><input className="input" type="number" inputMode="numeric" placeholder="e.g. 2022" value={f.vintage} onChange={set('vintage')} /></Field>
+        <Field label="Year (vintage)"><input className="input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="e.g. 2019" value={f.vintage} onChange={set('vintage')} /></Field>
         <Field label="Date"><input className="input" type="date" value={f.drankAt} max={today()} onChange={set('drankAt')} /></Field>
         {byGlass ? (
           <Field label="Bar or restaurant"><input className="input" placeholder="e.g. Café de Witte Aap" value={f.location} onChange={set('location')} /></Field>

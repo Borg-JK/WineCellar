@@ -1,14 +1,16 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Bookmark, Clock, Minus, Pencil, Plus, RotateCcw, Trash2, Warehouse, Wine as WineIcon } from 'lucide-react'
-import { addToCellar, changeCellarQuantity, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
+import { addToCellar, changeCellarQuantity, createWine, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
 import type { CellarItem, Wine } from '../lib/types'
-import { euro } from '../lib/util'
+import { euro, fmtScore, slug } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { CellarForm } from '../components/CellarForm'
 import { WineRow } from '../components/WineCard'
 import { Empty, Sheet, Tabs } from '../components/ui'
 import { WineSearch } from './Explore'
+import { PhotoPicker } from '../components/PhotoPicker'
+import { draftFrom, draftToWine, WineFields, type WineDraft } from '../components/WineFields'
 
 type Tab = 'home' | 'wishlist' | 'again'
 const YEAR = new Date().getFullYear()
@@ -23,12 +25,16 @@ function drinkStatus(i: CellarItem): { label: string; tone: string } | null {
 
 export function Cellar() {
   const me = useMe()
-  const { cellar, wishlist, myCheckins, wineMap } = useApp()
+  const { cellar, wishlist, myCheckins, wineMap, producerMap } = useApp()
   const [tab, setTab] = useState<Tab>('home')
   const [editing, setEditing] = useState<CellarItem | null>(null)
   const [adding, setAdding] = useState(false)
   const [picked, setPicked] = useState<Wine | null>(null)
-  const closeAdd = () => { setAdding(false); setPicked(null) }
+  /** Set while adding a wine that isn't in the catalogue yet: its details and the bottles in one form. */
+  const [draft, setDraft] = useState<WineDraft | null>(null)
+  const [photos, setPhotos] = useState<File[]>([])
+  const closeAdd = () => { setAdding(false); setPicked(null); setDraft(null); setPhotos([]) }
+  const sheetTitle = picked ? 'Add to cellar' : draft ? 'New wine for your cellar' : 'Which wine?'
 
   const bottles = cellar.reduce((s, i) => s + i.quantity, 0)
   const value = cellar.reduce((s, i) => s + i.quantity * (i.price ?? 0), 0)
@@ -62,7 +68,7 @@ export function Cellar() {
               <div key={i.id} className="card p-3">
                 <WineRowBare item={i} />
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 pl-[60px] text-xs text-ink/60">
-                  {i.vintage && <span>{i.vintage}</span>}
+                  {i.vintage && <span className="rounded bg-wine-50 px-1.5 font-semibold text-wine-800">{i.vintage}</span>}
                   {i.storeName && <span>{i.storeName}</span>}
                   {i.price != null && <span>{euro(i.price)}</span>}
                   {i.location && <span>📍 {i.location}</span>}
@@ -97,16 +103,30 @@ export function Cellar() {
         <Empty icon={<RotateCcw size={28} />} title="Nothing here yet">Tick "I would buy this again" when you log a wine and it shows up here as a shopping list.</Empty>
       ) : again.map(([wineId, info]) => wineMap.get(wineId) && (
         <WineRow key={wineId} wine={wineMap.get(wineId)!} to={`/wines/${wineId}`}
-          sub={<p className="mt-0.5 text-xs text-wine-600">You gave it {info.rating ? info.rating.toFixed(1) : '–'}{info.store && ` · bought at ${info.store}`}</p>} />
+          sub={<p className="mt-0.5 text-xs text-wine-600">You gave it {info.rating ? `${fmtScore(info.rating)}/10` : '–'}{info.store && ` · bought at ${info.store}`}</p>} />
       )))}
 
-      <Sheet open={adding} onClose={closeAdd} title={picked ? 'Add to cellar' : 'Which wine?'}>
+      <Sheet open={adding} onClose={closeAdd} title={sheetTitle}>
         {picked ? (
           <div className="space-y-4">
             <WineRow wine={picked} right={<button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setPicked(null)}>Change</button>} />
             <CellarForm key={picked.id} submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, picked, v); closeAdd() }} />
           </div>
-        ) : <WineSearch onPick={setPicked} addLink="/wines/new?next=cellar" />}
+        ) : draft ? (
+          <CellarForm submitLabel="Add to cellar" onSubmit={async (v) => {
+            const data = await draftToWine(draft, me.id, producerMap.has(slug(draft.producer)))
+            const wine = await createWine(me.id, data, photos)
+            await addToCellar(me.id, wine, v)
+            closeAdd()
+          }}>
+            <button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setDraft(null)}>← Back to search</button>
+            <WineFields value={draft} onChange={setDraft} showStores={false} />
+            <div>
+              <span className="label">Bottle photo</span>
+              <PhotoPicker files={photos} onChange={setPhotos} max={2} />
+            </div>
+          </CellarForm>
+        ) : <WineSearch onPick={setPicked} onAdd={(typed) => setDraft(draftFrom(undefined, { name: typed }))} />}
       </Sheet>
 
       <Sheet open={!!editing} onClose={() => setEditing(null)} title="Edit cellar entry">

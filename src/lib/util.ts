@@ -46,6 +46,17 @@ export const snapOf = (w: Wine, fallbackPhoto = ''): WineSnap => ({
   photo: w.photos[0] ?? fallbackPhoto,
 })
 
+/**
+ * Ratings are stored as 0.5–5 (half stars, so old data keeps working) and shown out of 10.
+ * 0 means "no rating".
+ */
+export const toTen = (stored: number) => stored * 2
+export const fromTen = (score: number) => score / 2
+export const fmtScore = (stored: number) => {
+  const s = toTen(stored)
+  return Number.isInteger(s) ? String(s) : s.toFixed(1)
+}
+
 export const avgRating = (w: Pick<Wine, 'ratingSum' | 'ratingCount'>) =>
   w.ratingCount > 0 ? w.ratingSum / w.ratingCount : 0
 
@@ -59,6 +70,9 @@ export function matchesWine(w: Wine, q: string) {
   const hay = fold([w.name, w.producer, w.country, w.region, w.type, ...w.grapes].join(' '))
   return fold(q).split(/\s+/).filter(Boolean).every((t) => hay.includes(t))
 }
+
+/** A producer's id: the slug of its name, so "Château Musar" and "chateau musar" are the same producer. */
+export const producerIdOf = (w: { producer: string; producerId?: string }) => w.producerId || slug(w.producer)
 
 export const errMsg = (e: unknown) => {
   const m = e instanceof Error ? e.message : String(e)

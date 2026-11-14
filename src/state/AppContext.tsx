@@ -3,7 +3,9 @@ import { onAuthStateChanged, type User } from 'firebase/auth'
 import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
 import { getProfile, read, syncVisibility } from '../lib/db'
-import type { CellarItem, Checkin, Friendship, Store, UserProfile, Wine, WishlistItem } from '../lib/types'
+import type { CellarItem, Checkin, Friendship, Producer, Store, UserProfile, Wine, WishlistItem } from '../lib/types'
+import { producerIdOf } from '../lib/util'
+import { SEED_PRODUCERS } from '../data/seedProducers'
 import { SEED_WINES } from '../data/seedWines'
 import { SEED_STORES } from '../data/seedStores'
 
@@ -20,6 +22,9 @@ interface AppState {
   wineMap: Map<string, Wine>
   stores: Store[]
   storeMap: Map<string, Store>
+  /** Every known producer: the starter list, producers of catalogue and user wines, and ones users added. */
+  producers: Producer[]
+  producerMap: Map<string, Producer>
   myCheckins: Checkin[]
   feed: Checkin[]
   cellar: CellarItem[]
@@ -52,6 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [people, setPeople] = useState<Map<string, UserProfile>>(new Map())
   const [dbWines, setDbWines] = useState<Wine[]>([])
   const [dbStores, setDbStores] = useState<Store[]>([])
+  const [dbProducers, setDbProducers] = useState<Producer[]>([])
   const [myCheckins, setMyCheckins] = useState<Checkin[]>([])
   const [myCheckinsLoaded, setMyCheckinsLoaded] = useState(false)
   const [rawFeed, setRawFeed] = useState<Checkin[]>([])
@@ -93,6 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return { ...w, grapes: w.grapes ?? [], photos: w.photos ?? [], storeIds: w.storeIds ?? [], ratingSum: w.ratingSum ?? 0, ratingCount: w.ratingCount ?? 0 }
       })), log('wines')),
       onSnapshot(collection(db, 'stores'), (s) => setDbStores(s.docs.map((d) => read<Store>(d))), log('stores')),
+      onSnapshot(collection(db, 'producers'), (s) => setDbProducers(s.docs.map((d) => ({ ...read<Producer>(d), source: 'user' as const }))), log('producers')),
       onSnapshot(query(checkins, where('uid', '==', uid)), (s) => {
         setMyCheckins(s.docs.map((d) => checkinDefaults(read<Checkin>(d))).sort(byNewest)); setMyCheckinsLoaded(true)
       }, log('my check-ins')),
@@ -127,10 +134,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const wines = useMemo(() => {
     const m = new Map<string, Wine>(SEED_WINES.map((w) => [w.id, w]))
-    for (const w of dbWines) m.set(w.id, w)
+    // A catalogue wine copied to Firestore keeps its bundled bottle photo after any user photos.
+    for (const w of dbWines) {
+      const seed = m.get(w.id)
+      m.set(w.id, seed?.photos.length ? { ...w, photos: [...new Set([...w.photos, ...seed.photos])] } : w)
+    }
     return [...m.values()].sort((a, b) => `${a.producer} ${a.name}`.localeCompare(`${b.producer} ${b.name}`))
   }, [dbWines])
   const wineMap = useMemo(() => new Map(wines.map((w) => [w.id, w])), [wines])
+
+  const producers = useMemo(() => {
+    const m = new Map<string, Producer>(SEED_PRODUCERS.map((p) => [p.id, p]))
+    for (const w of wines) {
+      const id = producerIdOf(w)
+      const known = m.get(id)
+      if (!known) m.set(id, { id, name: w.producer, country: w.country, region: w.region, source: 'catalog' })
+      else if (!known.country && w.country) m.set(id, { ...known, country: w.country, region: known.region || w.region })
+    }
+    for (const p of dbProducers) m.set(p.id, { ...m.get(p.id), ...p })
+    return [...m.values()].filter((p) => p.id).sort((a, b) => a.name.localeCompare(b.name))
+  }, [wines, dbProducers])
+  const producerMap = useMemo(() => new Map(producers.map((p) => [p.id, p])), [producers])
 
   const stores = useMemo(() => [...SEED_STORES, ...dbStores], [dbStores])
   const storeMap = useMemo(() => new Map(stores.map((s) => [s.id, s])), [stores])
@@ -142,7 +166,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [rawFeed, friendKey, uid])
 
   const value: AppState = {
-    user, authReady, profile, friendships, friendIds, people, wines, wineMap, stores, storeMap,
+    user, authReady, profile, friendships, friendIds, people, wines, wineMap, stores, storeMap, producers, producerMap,
     myCheckins, feed, cellar, wishlist,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>

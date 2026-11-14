@@ -2,9 +2,10 @@ import { Link } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import type { Wine, WineSnap } from '../lib/types'
 import { avgRating } from '../lib/util'
-import { BottleImage, Stars, TypeDot } from './ui'
+import { BottleImage, Score, TypeDot } from './ui'
 
-export function WineRow({ wine, to, right, sub }: { wine: Wine | WineSnap; to?: string; right?: ReactNode; sub?: ReactNode }) {
+/** `hideRating` drops everyone's average, e.g. where the row already shows your own score. */
+export function WineRow({ wine, to, right, sub, hideRating }: { wine: Wine | WineSnap; to?: string; right?: ReactNode; sub?: ReactNode; hideRating?: boolean }) {
   const full = 'grapes' in wine ? wine : null
   const photo = full ? full.photos[0] : (wine as WineSnap).photo
   const body = (
@@ -17,8 +18,8 @@ export function WineRow({ wine, to, right, sub }: { wine: Wine | WineSnap; to?: 
           <span className="inline-flex items-center gap-1 capitalize"><TypeDot type={wine.type} /> {wine.type}</span>
           {wine.country && <span>· {wine.country}</span>}
           {full && full.grapes.length > 0 && <span className="truncate">· {full.grapes.slice(0, 2).join(', ')}</span>}
-          {full && full.ratingCount > 0 && (
-            <span className="inline-flex items-center gap-1">· <Stars value={avgRating(full)} size={12} /> {avgRating(full).toFixed(1)}</span>
+          {full && !hideRating && full.ratingCount > 0 && (
+            <span className="inline-flex items-center gap-1">· <Score value={avgRating(full)} size="sm" /></span>
           )}
         </div>
         {sub}
