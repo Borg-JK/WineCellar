@@ -18,12 +18,21 @@ export function WineSearch({ linkTo, onPick, addLink, onAdd }: { linkTo?: (id: s
     () => wines.filter((w) => (!type || w.type === type) && (!storeId || w.storeIds.includes(storeId)) && matchesWine(w, q)),
     [wines, q, type, storeId],
   )
+  // Always in reach at the top, so you never scroll through the catalogue to add your own wine.
+  const typed = q.trim()
+  const addLabel = typed ? <>Add <b className="font-semibold">“{typed}”</b> as a new wine</> : 'Add a new wine yourself'
+  const addClass = 'flex w-full cursor-pointer items-center gap-2 rounded-xl border border-dashed border-wine-300 bg-wine-50 px-3.5 py-2.5 text-left text-sm font-medium text-wine-800'
   return (
     <div className="space-y-3">
       <div className="relative">
         <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink/40" />
         <input className="input !pl-10" type="search" placeholder="Search wine, producer, grape, country…" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
+      {onAdd ? (
+        <button type="button" onClick={() => onAdd(typed)} className={addClass}><Plus size={18} className="shrink-0" /> <span className="min-w-0 truncate">{addLabel}</span></button>
+      ) : addLink && (
+        <Link to={`${addLink}${addLink.includes('?') ? '&' : '?'}name=${encodeURIComponent(typed)}`} className={addClass}><Plus size={18} className="shrink-0" /> <span className="min-w-0 truncate">{addLabel}</span></Link>
+      )}
       <div className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4">
         {WINE_TYPES.map((t) => (
           <button key={t} onClick={() => setType(type === t ? null : t)} className={cx('chip shrink-0 capitalize', type === t && 'chip-on')}>{t}</button>
@@ -42,15 +51,6 @@ export function WineSearch({ linkTo, onPick, addLink, onAdd }: { linkTo?: (id: s
         ) : <WineRow key={w.id} wine={w} to={linkTo?.(w.id)} right={<ChevronRight size={18} className="text-ink/30" />} />)}
         {results.length > 80 && <p className="px-1 text-xs text-ink/50">Showing the first 80. Type more of the name to narrow it down.</p>}
       </div>
-      {onAdd ? (
-        <button type="button" onClick={() => onAdd(q.trim())} className="card flex w-full cursor-pointer items-center gap-3 border-dashed !border-wine-300 bg-wine-50 p-4 text-left text-sm font-semibold text-wine-800">
-          <Plus size={20} /> Can't find it? Add the wine yourself
-        </button>
-      ) : addLink && (
-        <Link to={`${addLink}${addLink.includes('?') ? '&' : '?'}name=${encodeURIComponent(q.trim())}`} className="card flex items-center gap-3 border-dashed !border-wine-300 bg-wine-50 p-4 text-sm font-semibold text-wine-800">
-          <Plus size={20} /> Can't find it? Add the wine yourself
-        </Link>
-      )}
     </div>
   )
 }

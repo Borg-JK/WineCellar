@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { ChevronDown, GlassWater, Lock, Minus, Plus, RotateCcw, Warehouse, Wine as WineIcon, X } from 'lucide-react'
-import { addToCellar, createCheckin, updateCheckin } from '../lib/db'
+import { ChevronDown, GlassWater, Lock, Minus, Pencil, Plus, RotateCcw, Warehouse, Wine as WineIcon, X } from 'lucide-react'
+import { addToCellar, canEditInPlace, createCheckin, updateCheckin } from '../lib/db'
 import { FLAVOUR_TAGS, OCCASIONS, type Checkin, type CheckinInput, type Serving } from '../lib/types'
 import { cx, errMsg, euro, fmtDay, lastPurchase, today } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
@@ -122,6 +122,10 @@ export function LogWine({ editing }: { editing?: Checkin } = {}) {
     <form onSubmit={submit} className="space-y-5">
       {editing && <h1 className="text-2xl font-semibold">Edit check-in</h1>}
       <WineRow wine={shown} right={editing ? undefined : <Link to="/log" className="text-sm font-semibold text-wine-700">Change</Link>} />
+      {!editing && wine && owned.length === 0 && (
+        <Link to={canEditInPlace(wine, me.id) ? `/wines/${wine.id}/edit?next=log` : `/wines/new?from=${wine.id}&next=log`}
+          className="-mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-wine-700"><Pencil size={14} /> Details not right? Edit them</Link>
+      )}
       {(
         <div>
           <span className="label">How did you drink it?</span>

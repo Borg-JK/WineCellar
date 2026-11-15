@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bookmark, Check, Clock, GlassWater, Minus, Pencil, Plus, RotateCcw, Trash2, Warehouse, Wine as WineIcon } from 'lucide-react'
-import { addBottlePhotos, addToCellar, changeCellarQuantity, createWine, finishBottle, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
+import { addBottlePhotos, addToCellar, canEditInPlace, changeCellarQuantity, createWine, updateWine, finishBottle, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
 import type { CellarItem, Wine } from '../lib/types'
 import { euro, fmtDay, fmtScore, slug } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
@@ -10,6 +10,7 @@ import { CorkPop } from '../components/CorkPop'
 import { WineRow } from '../components/WineCard'
 import { Empty, Sheet, Tabs } from '../components/ui'
 import { WineSearch } from './Explore'
+import { EditCopyNote } from './WineForm'
 import { PhotoPicker } from '../components/PhotoPicker'
 import { draftFrom, draftToWine, WineFields, type WineDraft } from '../components/WineFields'
 
@@ -36,9 +37,12 @@ export function Cellar() {
   const [picked, setPicked] = useState<Wine | null>(null)
   /** Set while adding a wine that isn't in the catalogue yet: its details and the bottles in one form. */
   const [draft, setDraft] = useState<WineDraft | null>(null)
+  /** Set when the draft is an edit of a picked wine: yours is changed in place, anyone else's becomes a new version. */
+  const [basedOn, setBasedOn] = useState<Wine | null>(null)
   const [photos, setPhotos] = useState<File[]>([])
-  const closeAdd = () => { setAdding(false); setPicked(null); setDraft(null); setPhotos([]) }
-  const sheetTitle = picked ? 'Add to cellar' : draft ? 'New wine for your cellar' : 'Which wine?'
+  const closeAdd = () => { setAdding(false); setPicked(null); setDraft(null); setBasedOn(null); setPhotos([]) }
+  const editPicked = (w: Wine) => { setBasedOn(w); setDraft(draftFrom(w)); setPicked(null) }
+  const sheetTitle = picked ? 'Add to cellar' : basedOn ? 'Edit details' : draft ? 'New wine for your cellar' : 'Which wine?'
 
   const bottles = cellar.reduce((s, i) => s + i.quantity, 0)
   const value = cellar.reduce((s, i) => s + i.quantity * (i.price ?? 0), 0)
@@ -81,10 +85,11 @@ export function Cellar() {
                 </div>
                 {i.notes && <p className="mt-1 pl-[60px] text-xs italic text-ink/55">{i.notes}</p>}
                 {i.openedAt && (
-                  <div className="mt-2 flex items-center gap-2 rounded-xl bg-wine-50 px-3 py-2 text-sm text-wine-800">
+                  <div className="mt-2 flex items-center gap-2 rounded-xl bg-wine-50 py-1.5 pl-3 pr-1.5 text-sm text-wine-800">
                     <GlassWater size={16} className="shrink-0" />
                     <span className="flex-1">{i.quantity > 1 ? '1 bottle open' : 'Open'} since {fmtDay(i.openedAt)}</span>
-                    <button className="inline-flex items-center gap-1 font-semibold" onClick={() => confirm('Bottle empty? It comes off your stock.') && finishBottle(me.id, i)}>
+                    <button className="btn btn-outline !gap-1.5 !px-3.5 !py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-wine-400"
+                      onClick={() => confirm(i.quantity > 1 ? 'Finished this bottle? It comes off your stock.' : 'Finished this bottle? It was your last one, so it leaves your cellar.') && finishBottle(me.id, i)}>
                       <Check size={15} /> Finished
                     </button>
                   </div>
@@ -126,6 +131,9 @@ export function Cellar() {
         {picked ? (
           <div className="space-y-4">
             <WineRow wine={picked} right={<button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setPicked(null)}>Change</button>} />
+            <button type="button" className="inline-flex items-center gap-1.5 text-sm font-semibold text-wine-700" onClick={() => editPicked(picked)}>
+              <Pencil size={14} /> Details not right? Edit them
+            </button>
             <CellarForm key={picked.id} wineId={picked.id} submitLabel="Add to cellar" onSubmit={async (v) => {
               await addToCellar(me.id, picked, v, cellar)
               if (photos.length) await addBottlePhotos(picked, me.id, photos)
@@ -135,15 +143,25 @@ export function Cellar() {
             </CellarForm>
           </div>
         ) : draft ? (
-          <CellarForm submitLabel="Add to cellar" onSubmit={async (v) => {
+          <CellarForm wineId={basedOn && canEditInPlace(basedOn, me.id) ? basedOn.id : undefined} submitLabel={basedOn && !canEditInPlace(basedOn, me.id) ? 'Save my version and add' : 'Add to cellar'} onSubmit={async (v) => {
             const data = await draftToWine(draft, me.id, producerMap.has(slug(draft.producer)))
-            const wine = await createWine(me.id, data, photos)
-            await addToCellar(me.id, wine, v)
+            if (basedOn && canEditInPlace(basedOn, me.id)) {
+              await updateWine(basedOn.id, data)
+              const wine = { ...basedOn, ...data }
+              await addToCellar(me.id, wine, v, cellar)
+              if (photos.length) await addBottlePhotos(wine, me.id, photos)
+            } else {
+              const wine = await createWine(me.id, data, photos, basedOn?.photos)
+              await addToCellar(me.id, wine, v)
+            }
             closeAdd()
           }}>
-            <button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setDraft(null)}>← Back to search</button>
+            {basedOn
+              ? <button type="button" className="text-sm font-semibold text-wine-700" onClick={() => { setPicked(basedOn); setBasedOn(null); setDraft(null) }}>← Back</button>
+              : <button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setDraft(null)}>← Back to search</button>}
+            {basedOn && !canEditInPlace(basedOn, me.id) && <EditCopyNote />}
             <WineFields value={draft} onChange={setDraft} showStores={false} />
-            <BottlePhotoField files={photos} onChange={setPhotos} hasPhoto={false} />
+            <BottlePhotoField files={photos} onChange={setPhotos} hasPhoto={!!basedOn?.photos.length} />
           </CellarForm>
         ) : <WineSearch onPick={setPicked} onAdd={(typed) => setDraft(draftFrom(undefined, { name: typed }))} />}
       </Sheet>

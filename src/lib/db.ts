@@ -109,9 +109,14 @@ export async function ensureProducer(uid: string, name: string, country: string,
   return id
 }
 
-export async function createWine(uid: string, data: NewWine, bottleFiles: File[]): Promise<Wine> {
+/** A wine you added can be changed in place; anyone else's is copied into a new version instead. */
+export const canEditInPlace = (w: Wine, uid: string) => w.source === 'user' && w.createdBy === uid
+
+/** `keepPhotos`: photos carried over from the wine this one is a version of; new photos go first. */
+export async function createWine(uid: string, data: NewWine, bottleFiles: File[], keepPhotos: string[] = []): Promise<Wine> {
   const r = doc(collection(db, 'wines'))
-  const photos = await uploadBottlePhotos(r.id, uid, bottleFiles)
+  const uploaded = await uploadBottlePhotos(r.id, uid, bottleFiles)
+  const photos = [...uploaded, ...keepPhotos.filter(isUsablePhoto)]
   const wine: Wine = { ...data, id: r.id, photos, ratingSum: 0, ratingCount: 0, createdBy: uid, source: 'user' }
   const { id: _id, ...rest } = wine
   await setDoc(r, { ...rest, createdAt: serverTimestamp() })

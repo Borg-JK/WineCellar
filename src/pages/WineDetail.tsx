@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Bookmark, Camera, Leaf, Pencil, Plus, Warehouse } from 'lucide-react'
-import { addBottlePhotos, addToCellar, toggleWishlist } from '../lib/db'
+import { addBottlePhotos, addToCellar, canEditInPlace, toggleWishlist } from '../lib/db'
 import { avgRating, cx, errMsg, fmtScore, producerIdOf } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { CellarForm } from '../components/CellarForm'
@@ -67,7 +67,7 @@ export function WineDetail() {
           <Bookmark size={17} fill={wished ? 'currentColor' : 'none'} /> {wished ? 'On wishlist' : 'Wishlist'}
         </button>
         <button className="btn btn-ghost" disabled={uploading} onClick={() => fileRef.current?.click()}>{uploading ? <Spinner /> : <Camera size={17} />} Add bottle photo</button>
-        {wine.source === 'user' && wine.createdBy === me.id && <Link to={`/wines/${wine.id}/edit`} className="btn btn-ghost"><Pencil size={16} /> Edit details</Link>}
+        <Link to={canEditInPlace(wine, me.id) ? `/wines/${wine.id}/edit` : `/wines/new?from=${wine.id}`} className="btn btn-ghost"><Pencil size={16} /> Edit details</Link>
         <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={(e) => upload(e.target.files)} />
       </div>
 
@@ -107,6 +107,8 @@ export function WineDetail() {
           if (cellarPhotos.length) await addBottlePhotos(wine, me.id, cellarPhotos)
           setCellarPhotos([]); setCellarOpen(false)
         }}>
+          <Link to={canEditInPlace(wine, me.id) ? `/wines/${wine.id}/edit?next=cellar` : `/wines/new?from=${wine.id}&next=cellar`}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-wine-700"><Pencil size={14} /> Details not right? Edit them</Link>
           <BottlePhotoField files={cellarPhotos} onChange={setCellarPhotos} hasPhoto={wine.photos.length > 0} />
         </CellarForm>
       </Sheet>
