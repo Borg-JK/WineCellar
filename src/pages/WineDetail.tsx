@@ -106,7 +106,7 @@ export function WineDetail() {
       )}
 
       <Sheet open={cellarOpen} onClose={() => setCellarOpen(false)} title="Add to cellar">
-        <CellarForm submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, wine, v); setCellarOpen(false) }} />
+        <CellarForm wineId={wine.id} submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, wine, v, cellar); setCellarOpen(false) }} />
       </Sheet>
       <Lightbox src={zoom} onClose={() => setZoom(null)} />
     </div>

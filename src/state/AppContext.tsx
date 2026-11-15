@@ -26,6 +26,8 @@ interface AppState {
   producers: Producer[]
   producerMap: Map<string, Producer>
   myCheckins: Checkin[]
+  /** False until the first snapshot of your own check-ins arrives. */
+  myCheckinsLoaded: boolean
   feed: Checkin[]
   cellar: CellarItem[]
   wishlist: WishlistItem[]
@@ -167,7 +169,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value: AppState = {
     user, authReady, profile, friendships, friendIds, people, wines, wineMap, stores, storeMap, producers, producerMap,
-    myCheckins, feed, cellar, wishlist,
+    myCheckins, myCheckinsLoaded, feed, cellar, wishlist,
   }
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

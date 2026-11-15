@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore'
-import { GlassWater, Lock, MapPin, MessageCircle, RotateCcw, Send, ShoppingBag, Trash2, Utensils, Wine as WineIcon } from 'lucide-react'
+import { GlassWater, Lock, MapPin, Pencil, MessageCircle, RotateCcw, Send, ShoppingBag, Trash2, Utensils, Wine as WineIcon } from 'lucide-react'
 import { db } from '../lib/firebase'
 import { addComment, deleteCheckin, deleteComment, read, toggleCheers } from '../lib/db'
 import type { Checkin, Comment } from '../lib/types'
@@ -33,9 +33,11 @@ export function CheckinCard({ c }: { c: Checkin }) {
           <p className="flex items-center gap-1.5 text-xs text-ink/50">
             {timeAgo(c.createdAt)}
             {c.occasion && <span>· {c.occasion}</span>}
+            {c.editedAt && <span>· edited</span>}
             {c.private && <Lock size={11} aria-label="Only you can see this" />}
           </p>
         </div>
+        {mine && <Link to={`/checkins/${c.id}/edit`} aria-label="Edit check-in" className="btn btn-ghost !p-2 text-ink/50"><Pencil size={16} /></Link>}
         {mine && <button onClick={remove} aria-label="Delete check-in" className="btn btn-ghost !p-2 text-ink/40"><Trash2 size={16} /></button>}
       </header>
 

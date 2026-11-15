@@ -1,4 +1,4 @@
-import type { Checkin, Wine, WineSnap, WineType } from './types'
+import type { CellarItem, Checkin, Wine, WineSnap, WineType } from './types'
 
 export const cx = (...a: (string | false | null | undefined)[]) => a.filter(Boolean).join(' ')
 
@@ -73,6 +73,19 @@ export function matchesWine(w: Wine, q: string) {
 
 /** A producer's id: the slug of its name, so "Château Musar" and "chateau musar" are the same producer. */
 export const producerIdOf = (w: { producer: string; producerId?: string }) => w.producerId || slug(w.producer)
+
+/**
+ * What you paid and where, the last time you bought this wine: your newest cellar entry,
+ * else your newest check-in of a bottle. Used to fill in forms so you don't type it again.
+ */
+export function lastPurchase(wineId: string, cellar: CellarItem[], checkins: Checkin[]) {
+  const inCellar = cellar.filter((c) => c.wineId === wineId).sort((a, b) => b.createdAt - a.createdAt)[0]
+  if (inCellar) return { vintage: inCellar.vintage, storeName: inCellar.storeName, price: inCellar.price, from: 'cellar' as const }
+  const logged = checkins.filter((c) => c.wineId === wineId && c.serving !== 'glass' && (c.storeName || c.price != null))
+    .sort((a, b) => b.createdAt - a.createdAt)[0]
+  if (logged) return { vintage: logged.vintage, storeName: logged.storeName, price: logged.price, from: 'checkin' as const }
+  return null
+}
 
 export const errMsg = (e: unknown) => {
   const m = e instanceof Error ? e.message : String(e)

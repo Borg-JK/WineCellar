@@ -110,7 +110,7 @@ export function Cellar() {
         {picked ? (
           <div className="space-y-4">
             <WineRow wine={picked} right={<button type="button" className="text-sm font-semibold text-wine-700" onClick={() => setPicked(null)}>Change</button>} />
-            <CellarForm key={picked.id} submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, picked, v); closeAdd() }} />
+            <CellarForm key={picked.id} wineId={picked.id} submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, picked, v, cellar); closeAdd() }} />
           </div>
         ) : draft ? (
           <CellarForm submitLabel="Add to cellar" onSubmit={async (v) => {

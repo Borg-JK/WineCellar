@@ -8,7 +8,7 @@ import { Feed } from './pages/Feed'
 import { Explore } from './pages/Explore'
 import { WineForm } from './pages/WineForm'
 import { WineDetail } from './pages/WineDetail'
-import { LogPick, LogWine } from './pages/LogWine'
+import { EditCheckin, LogPick, LogWine } from './pages/LogWine'
 import { Cellar } from './pages/Cellar'
 import { Friends } from './pages/Friends'
 import { Profile } from './pages/Profile'
@@ -31,6 +31,7 @@ function Gate() {
         <Route path="wines/:id/edit" element={<WineForm />} />
         <Route path="log" element={<LogPick />} />
         <Route path="log/:id" element={<LogWine />} />
+        <Route path="checkins/:checkinId/edit" element={<EditCheckin />} />
         <Route path="cellar" element={<Cellar />} />
         <Route path="friends" element={<Friends />} />
         <Route path="profile" element={<Profile />} />

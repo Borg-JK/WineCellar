@@ -99,6 +99,8 @@ export interface Checkin {
   bottlePhotos: string[]
   drankAt: string
   createdAt: number
+  /** Set when the owner changed the check-in after posting it. */
+  editedAt?: number
   visibleTo: string[]
   cheers: string[]
   commentCount: number

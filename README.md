@@ -7,7 +7,7 @@ React + TypeScript + Vite + Tailwind, with Firebase (Auth, Firestore, Storage) a
 ## What it does
 
 - **Accounts**: email/password and Google sign-in, unique usernames, profile photo and bio.
-- **Check-ins**: a score out of 10, a bottle or by the glass (number of glasses, price per glass, bar or restaurant), rating in half stars, vintage, date, store, price, tasting notes, flavour tags, occasion, food pairing, location, friends you drank with, "would buy again", and an "only me" switch.
+- **Check-ins**: editable afterwards (pencil on your own check-ins); a bottle you have at home is picked from your cellar automatically, and extra bottles you bought can go into the cellar from the same form; a score out of 10, a bottle or by the glass (number of glasses, price per glass, bar or restaurant), rating in half stars, vintage, date, store, price, tasting notes, flavour tags, occasion, food pairing, location, friends you drank with, "would buy again", and an "only me" switch.
 - **Two kinds of photos**: *bottle photos* go onto the wine's page so everyone recognises the bottle; *moment photos* stay on the check-in. Several of each, straight from the camera or the library.
 - **Feed**: your and your friends' check-ins, with cheers and comments.
 - **Friends**: search by name or username, share an invite link to your profile, send / accept / decline requests.

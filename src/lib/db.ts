@@ -16,7 +16,7 @@ type Snap = QueryDocumentSnapshot<DocumentData> | DocumentSnapshot<DocumentData>
 export function read<T>(s: Snap): T {
   const d = s.data({ serverTimestamps: 'estimate' }) ?? {}
   const out: Record<string, unknown> = { ...d, id: s.id }
-  for (const k of ['createdAt', 'acceptedAt']) {
+  for (const k of ['createdAt', 'acceptedAt', 'editedAt']) {
     const v = d[k]
     if (v && typeof v.toMillis === 'function') out[k] = v.toMillis()
   }
@@ -182,6 +182,40 @@ export async function createCheckin(opts: {
   return r.id
 }
 
+/**
+ * Change a check-in you made. Keeps the wine's rating totals right when the score changes,
+ * re-applies who may see it, and handles added and removed moment photos.
+ */
+export async function updateCheckin(opts: {
+  c: Checkin
+  input: CheckinInput
+  friendIds: string[]
+  keepMoments: string[]
+  newMoments: File[]
+}) {
+  const { c, input, friendIds, keepMoments, newMoments } = opts
+  const stamp = Date.now()
+  const added = await Promise.all(newMoments.map((f, i) => uploadImage(`users/${c.uid}/checkins/${c.id}/${stamp}_${i}.jpg`, f)))
+  await updateDoc(doc(db, 'checkins', c.id), {
+    ...input,
+    momentPhotos: [...keepMoments, ...added],
+    visibleTo: input.private ? [c.uid] : [c.uid, ...friendIds],
+    editedAt: serverTimestamp(),
+  })
+  const before = c.rating, after = input.rating
+  const wineUpdate: DocumentData = {}
+  if (before !== after) {
+    wineUpdate.ratingSum = increment(after - before)
+    if (before === 0) wineUpdate.ratingCount = increment(1)
+    if (after === 0) wineUpdate.ratingCount = increment(-1)
+  }
+  if (input.storeId && input.storeId !== c.storeId) wineUpdate.storeIds = arrayUnion(input.storeId)
+  if (Object.keys(wineUpdate).length) {
+    await updateDoc(doc(db, 'wines', c.wineId), wineUpdate).catch((e) => console.warn('[wine totals]', e.message))
+  }
+  await Promise.all(c.momentPhotos.filter((p) => !keepMoments.includes(p)).map(deleteImage))
+}
+
 export async function deleteCheckin(c: Checkin) {
   await deleteDoc(doc(db, 'checkins', c.id))
   if (c.rating > 0) {
@@ -220,8 +254,24 @@ export async function syncVisibility(uid: string, friendIds: string[], mine: Che
 
 /* ───────────── Cellar & wishlist ───────────── */
 
-export async function addToCellar(uid: string, wine: Wine, input: CellarInput) {
+/** The cellar entry new bottles of this wine and year would join, if any. */
+export const sameCellarEntry = (current: CellarItem[], wineId: string, vintage: number | null) =>
+  current.find((c) => c.wineId === wineId && (c.vintage ?? null) === (vintage ?? null))
+
+/**
+ * Put bottles in the cellar. Same wine and same year as an existing entry → that entry's
+ * count goes up (and blanks get filled in) instead of a second row appearing.
+ */
+export async function addToCellar(uid: string, wine: Wine, input: CellarInput, current: CellarItem[] = []) {
   await ensureWine(wine, uid)
+  const match = sameCellarEntry(current, wine.id, input.vintage)
+  if (match) {
+    const fill: DocumentData = { quantity: increment(input.quantity) }
+    for (const k of ['storeName', 'price', 'drinkFrom', 'drinkBy', 'location', 'notes'] as const) {
+      if ((match[k] == null || match[k] === '') && input[k] != null && input[k] !== '') fill[k] = input[k]
+    }
+    return updateDoc(doc(db, 'users', uid, 'cellar', match.id), fill)
+  }
   await addDoc(collection(db, 'users', uid, 'cellar'), {
     ...input, wineId: wine.id, wine: snapOf(wine), createdAt: serverTimestamp(),
   })
