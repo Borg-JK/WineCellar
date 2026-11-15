@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Bookmark, Check, Clock, GlassWater, Minus, Pencil, Plus, RotateCcw, Trash2, Warehouse, Wine as WineIcon } from 'lucide-react'
-import { addBottlePhotos, addToCellar, canEditInPlace, changeCellarQuantity, createWine, updateWine, finishBottle, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
+import { addBottlePhotos, addToCellar, canEditInPlace, changeCellarQuantity, createWine, updateWine, finishBottle, markOpened, removeCellarItem, removeFromWishlist, updateCellarItem } from '../lib/db'
 import type { CellarItem, Wine } from '../lib/types'
-import { euro, fmtDay, fmtScore, slug } from '../lib/util'
+import { euro, fmtDay, fmtScore, slug, today } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { CellarForm } from '../components/CellarForm'
 import { CorkPop } from '../components/CorkPop'
@@ -106,6 +106,12 @@ export function Cellar() {
                   <button aria-label="Edit" className="btn btn-ghost !p-2" onClick={() => setEditing(i)}><Pencil size={16} /></button>
                   <button aria-label="Remove" className="btn btn-ghost !p-2 text-ink/40" onClick={() => confirm('Remove this wine from your cellar?') && removeCellarItem(me.id, i.id)}><Trash2 size={16} /></button>
                 </div>
+                {!i.openedAt && (
+                  // A bottle that was opened without a check-in (e.g. before you used the app). The date can be changed with the pencil.
+                  <button className="btn btn-ghost mt-1.5 w-full !py-1.5 text-ink/60" onClick={() => markOpened(me.id, i, today())}>
+                    <GlassWater size={15} /> Already open? Mark it, no check-in
+                  </button>
+                )}
               </div>
             )
           })}

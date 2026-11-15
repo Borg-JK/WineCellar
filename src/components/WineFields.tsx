@@ -1,4 +1,5 @@
-import { useId } from 'react'
+import { useId, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { Plus, X } from 'lucide-react'
 import { ensureProducer, type NewWine } from '../lib/db'
 import { WINE_TYPES, type Wine, type WineType } from '../lib/types'
 import { cx, slug } from '../lib/util'
@@ -6,7 +7,18 @@ import { useApp } from '../state/AppContext'
 import { Field } from './ui'
 
 const COUNTRIES = ['France', 'Italy', 'Spain', 'Portugal', 'Germany', 'Austria', 'Netherlands', 'Greece', 'Hungary', 'Georgia', 'Lebanon', 'South Africa', 'Chile', 'Argentina', 'Uruguay', 'United States', 'Canada', 'Australia', 'New Zealand']
-const GRAPES = ['Cabernet Sauvignon', 'Merlot', 'Pinot Noir', 'Syrah', 'Shiraz', 'Grenache', 'Tempranillo', 'Sangiovese', 'Malbec', 'Primitivo', 'Nebbiolo', 'Gamay', 'Chardonnay', 'Sauvignon Blanc', 'Pinot Grigio', 'Riesling', 'Chenin Blanc', 'Verdejo', 'Viognier', 'Grüner Veltliner', 'Albariño', 'Glera']
+/** Common grapes first (shown before you type), then the rest. Grapes of wines already in the app are added on top. */
+const GRAPES = [
+  'Cabernet Sauvignon', 'Merlot', 'Pinot Noir', 'Syrah', 'Shiraz', 'Grenache', 'Tempranillo', 'Sangiovese', 'Malbec', 'Primitivo',
+  'Nebbiolo', 'Gamay', 'Chardonnay', 'Sauvignon Blanc', 'Pinot Grigio', 'Riesling', 'Chenin Blanc', 'Verdejo', 'Viognier',
+  'Grüner Veltliner', 'Albariño', 'Glera',
+  'Aglianico', 'Alvarinho', 'Arinto', 'Assyrtiko', 'Barbera', 'Blaufränkisch', 'Bonarda', 'Cabernet Franc', 'Carignan', 'Carménère',
+  'Catarratto', 'Cinsault', 'Colombard', 'Corvina', 'Cortese', 'Dolcetto', 'Fiano', 'Furmint', 'Garganega', 'Garnacha', 'Gewürztraminer',
+  'Godello', 'Greco', 'Grillo', 'Lambrusco', 'Loureiro', 'Macabeo', 'Marsanne', 'Melon de Bourgogne', 'Monastrell', 'Montepulciano',
+  'Moscato', 'Mourvèdre', 'Muscat', 'Müller-Thurgau', 'Nero d\'Avola', 'Palomino', 'Parellada', 'Pedro Ximénez', 'Petit Verdot',
+  'Picpoul', 'Pinot Blanc', 'Pinot Gris', 'Pinot Meunier', 'Pinotage', 'Rkatsiteli', 'Roussanne', 'Saperavi', 'Sémillon', 'Silvaner',
+  'Tannat', 'Torrontés', 'Touriga Nacional', 'Trebbiano', 'Ugni Blanc', 'Verdicchio', 'Vermentino', 'Xarel·lo', 'Zinfandel', 'Zweigelt',
+]
 
 export interface WineDraft {
   name: string
@@ -53,10 +65,6 @@ export function WineFields({ value: f, onChange, showStores = true }: { value: W
     // Fill in where the producer is from, unless the person already typed it.
     set({ producer: name, country: f.country || p?.country || '', region: f.region || p?.region || '' })
   }
-  const addGrape = (g: string) => {
-    const cur = f.grapes.split(',').map((x) => x.trim()).filter(Boolean)
-    if (!cur.includes(g)) set({ grapes: [...cur, g].join(', ') })
-  }
   const toggleStore = (sid: string) => set({ storeIds: f.storeIds.includes(sid) ? f.storeIds.filter((s) => s !== sid) : [...f.storeIds, sid] })
 
   return (
@@ -72,12 +80,7 @@ export function WineFields({ value: f, onChange, showStores = true }: { value: W
           {WINE_TYPES.map((t) => <button type="button" key={t} onClick={() => set({ type: t })} className={cx('chip capitalize', f.type === t && 'chip-on')}>{t}</button>)}
         </div>
       </div>
-      <Field label="Grapes" hint="Separate several grapes with commas.">
-        <input className="input" placeholder="e.g. Grenache, Syrah" value={f.grapes} onChange={(e) => set({ grapes: e.target.value })} />
-      </Field>
-      <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
-        {GRAPES.map((g) => <button type="button" key={g} onClick={() => addGrape(g)} className="tag shrink-0 cursor-pointer">+ {g}</button>)}
-      </div>
+      <GrapePicker value={f.grapes} onChange={(grapes) => set({ grapes })} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Country">
           <input className="input" list={`${ids}-countries`} value={f.country} onChange={(e) => set({ country: e.target.value })} />
@@ -97,6 +100,97 @@ export function WineFields({ value: f, onChange, showStores = true }: { value: W
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+const splitGrapes = (v: string) => v.split(',').map((x) => x.trim()).filter(Boolean)
+
+/**
+ * Grapes as chips, with a type-ahead: start typing and matching grapes drop down; tap one (or press Enter) to add it.
+ * A grape that isn't on the list can be added as typed. Stored as the same comma-separated text as before.
+ */
+function GrapePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { wines } = useApp()
+  const ids = useId()
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const [active, setActive] = useState(0)
+  const input = useRef<HTMLInputElement>(null)
+  const closing = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const selected = splitGrapes(value)
+  const chosen = new Set(selected.map(slug))
+
+  const all = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const g of [...GRAPES, ...wines.flatMap((w) => w.grapes)]) if (g.trim() && !m.has(slug(g))) m.set(slug(g), g.trim())
+    return [...m.values()]
+  }, [wines])
+
+  const needle = slug(q)
+  const matches = (needle
+    ? all.filter((g) => slug(g).includes(needle)).sort((a, b) => Number(!slug(a).startsWith(needle)) - Number(!slug(b).startsWith(needle)))
+    : all
+  ).filter((g) => !chosen.has(slug(g))).slice(0, 8)
+  const custom = q.trim() && !all.some((g) => slug(g) === needle) && !chosen.has(needle) ? q.trim() : ''
+  const options = custom ? [...matches, custom] : matches
+  const shown = open && options.length > 0
+
+  const add = (g: string) => {
+    if (!chosen.has(slug(g))) onChange([...selected, g].join(', '))
+    setQ(''); setActive(0)
+    clearTimeout(closing.current); setOpen(true); input.current?.focus()
+  }
+  const remove = (g: string) => onChange(selected.filter((x) => x !== g).join(', '))
+
+  const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault(); setOpen(true)
+      setActive((i) => (options.length ? (i + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length : 0))
+    } else if (e.key === 'Enter' || e.key === ',') {
+      // Enter must not submit the whole form while picking a grape.
+      if (e.key === ',' || q.trim()) e.preventDefault()
+      if (q.trim()) add(shown ? options[Math.min(active, options.length - 1)] : q.trim())
+    } else if (e.key === 'Backspace' && !q && selected.length) {
+      remove(selected[selected.length - 1])
+    } else if (e.key === 'Escape') {
+      setOpen(false)
+    }
+  }
+
+  return (
+    <div>
+      <label className="label" htmlFor={`${ids}-grape`}>Grapes</label>
+      <div className="relative">
+        <div className="flex flex-wrap items-center gap-1.5 rounded-xl border border-sand bg-white px-2 py-1.5 focus-within:border-wine-400 focus-within:ring-2 focus-within:ring-wine-100">
+          {selected.map((g) => (
+            <span key={g} className="inline-flex items-center gap-1 rounded-full bg-wine-100 py-1 pl-2.5 pr-1 text-sm font-medium text-wine-800">
+              {g}
+              <button type="button" aria-label={`Remove ${g}`} className="cursor-pointer rounded-full p-0.5 text-wine-700 hover:bg-wine-200" onClick={() => remove(g)}><X size={13} /></button>
+            </span>
+          ))}
+          <input ref={input} id={`${ids}-grape`} className="min-w-[8rem] flex-1 bg-transparent px-1.5 py-1 text-[16px] outline-none placeholder:text-ink/35"
+            role="combobox" aria-expanded={shown} aria-controls={`${ids}-grapes`} aria-autocomplete="list"
+            aria-activedescendant={shown ? `${ids}-opt-${active}` : undefined} autoComplete="off"
+            placeholder={selected.length ? 'Add another grape' : 'Start typing, e.g. Grenache'}
+            value={q} onChange={(e) => { setQ(e.target.value.replace(',', '')); setActive(0); setOpen(true) }}
+            onFocus={() => { clearTimeout(closing.current); setOpen(true) }}
+            // Phones blur the input before the tap on a suggestion lands, so close a moment later.
+            onBlur={() => { closing.current = setTimeout(() => setOpen(false), 150) }} onKeyDown={onKey} />
+        </div>
+        {shown && (
+          <ul id={`${ids}-grapes`} role="listbox" className="absolute inset-x-0 top-full z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-sand bg-white py-1 shadow-lg">
+            {options.map((g, i) => (
+              <li key={g} id={`${ids}-opt-${i}`} role="option" aria-selected={i === active}
+                // No focus change on mouse press, so the input stays active; the tap itself adds the grape.
+                onMouseDown={(e) => e.preventDefault()} onClick={() => add(g)} onMouseEnter={() => setActive(i)}
+                className={cx('flex cursor-pointer items-center gap-2 px-3.5 py-2.5 text-sm', i === active && 'bg-wine-50 text-wine-800')}>
+                {g === custom ? <><Plus size={15} className="text-wine-600" /> Add “{g}”</> : g}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }
