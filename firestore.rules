@@ -8,14 +8,30 @@ service cloud.firestore {
     function changedOnly(keys) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
+    function acceptedFriendship(id) {
+      return exists(/databases/$(database)/documents/friendships/$(id))
+        && get(/databases/$(database)/documents/friendships/$(id)).data.status == 'accepted';
+    }
+    // Friendship ids are the two uids sorted and joined with "_"; try both orders.
+    function isFriendOf(uid) {
+      return signedIn()
+        && (acceptedFriendship(uid + '_' + request.auth.uid) || acceptedFriendship(request.auth.uid + '_' + uid));
+    }
+    function sharesCellar(uid) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.get('shareCellar', false) == true;
+    }
 
     // Public-to-members profile: name, username, avatar, bio.
     match /users/{uid} {
       allow read: if signedIn();
       allow create, update: if isMe(uid);
 
-      // Private: bottles at home and wishlist.
-      match /cellar/{id} { allow read, write: if isMe(uid); }
+      // Bottles at home: the owner, plus friends when the owner turned on "share my cellar".
+      match /cellar/{id} {
+        allow read: if isMe(uid) || (isFriendOf(uid) && sharesCellar(uid));
+        allow write: if isMe(uid);
+      }
+      // Private: wishlist.
       match /wishlist/{id} { allow read, write: if isMe(uid); }
     }
 

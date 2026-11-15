@@ -7,15 +7,15 @@ React + TypeScript + Vite + Tailwind, with Firebase (Auth, Firestore, Storage) a
 ## What it does
 
 - **Accounts**: email/password and Google sign-in, unique usernames, profile photo and bio.
-- **Check-ins**: editable afterwards (pencil on your own check-ins); a bottle you have at home is picked from your cellar automatically, and extra bottles you bought can go into the cellar from the same form; a score out of 10, a bottle or by the glass (number of glasses, price per glass, bar or restaurant), rating in half stars, vintage, date, store, price, tasting notes, flavour tags, occasion, food pairing, location, friends you drank with, "would buy again", and an "only me" switch.
-- **Two kinds of photos**: *bottle photos* go onto the wine's page so everyone recognises the bottle; *moment photos* stay on the check-in. Several of each, straight from the camera or the library.
+- **Check-ins**: editable afterwards (pencil on your own check-ins); a bottle you have at home is picked from your cellar automatically, and extra bottles you bought can go into the cellar from the same form; a score out of 10 on a slider in steps of 0.25, a bottle or by the glass (number of glasses, price per glass, bar or restaurant), rating in half stars, vintage, date, store, price, tasting notes, flavour tags, occasion, food pairing, location, friends you drank with, "would buy again", and an "only me" switch.
+- **Two kinds of photos**: *bottle photos* go onto the wine's page so everyone recognises the bottle; *moment photos* stay on the check-in. Several of each, straight from the camera or the library. Camera shots can be saved to the phone too (share sheet → Save Image).
 - **Feed**: your and your friends' check-ins, with cheers and comments.
 - **Friends**: search by name or username, share an invite link to your profile, send / accept / decline requests.
-- **Catalogue**: about 315 starter wines, over 100 with a bottle photo from Open Food Facts (CC BY-SA, credited on each wine page; see `public/bottles/CREDITS.txt`), (red, white, rosé, sparkling, champagne, orange, dessert, fortified), with Albert Heijn and Gall & Gall ranges and Rotterdam wine shops. Anyone can add wines and stores by hand.
+- **Catalogue**: about 315 starter wines (red, white, rosé, sparkling, champagne, orange, dessert, fortified), with Albert Heijn and Gall & Gall ranges and Rotterdam wine shops. Anyone can add wines and stores by hand, also straight from the Cellar tab; those wines show up in everyone's search. A wine's picture is the newest bottle photo anyone took of it, from a check-in, the cellar form or the wine's page.
 - **Producers**: about 370 to pick from when adding a wine; a producer that isn't listed is saved for next time. Each has a page with its wines.
-- **Cellar**: add bottles straight from the Cellar tab (a wine that isn't in the catalogue is added in the same form) or from a wine's page; bottles at home with quantity, vintage, price, storage spot and drinking window; "Open a bottle" logs it and takes it off stock.
+- **Cellar**: add bottles straight from the Cellar tab (a wine that isn't in the catalogue is added in the same form) or from a wine's page; bottles at home with quantity, vintage, price, storage spot and drinking window; "Open a bottle" pops the cork (a short animation, tap to skip), logs it and asks whether you finished it: finished takes it off stock, "some left" keeps it in the cellar marked as open until you tap "Finished".
 - **Wishlist** and a **Buy again** list.
-- **Profile**: every wine you've tasted (search and sort), taste profile and badges built from your check-ins.
+- **Profile**: every wine you've tasted (search and sort), taste profile and badges built from your check-ins. Under *Edit profile* you choose what friends see on yours: your history (on by default) and your cellar (off by default; prices and notes stay private).
 - **Store pages**: which wines were found where, and what you spent there.
 - Installable on a phone's home screen.
 
@@ -77,7 +77,8 @@ storage.rules          photo upload rules
 | Path | Contents | Who can read |
 | --- | --- | --- |
 | `users/{uid}` | name, username, photo, bio | any signed-in user |
-| `users/{uid}/cellar`, `/wishlist` | bottles at home, saved wines | owner |
+| `users/{uid}/cellar` | bottles at home | owner, and friends if `shareCellar` is on |
+| `users/{uid}/wishlist` | saved wines | owner |
 | `usernames/{name}` | uid, keeps usernames unique | signed-in |
 | `friendships/{uidA_uidB}` | the two uids, who asked, status | the two people |
 | `wines/{id}` | shared catalogue, bottle photos, rating totals | signed-in |

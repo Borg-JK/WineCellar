@@ -65,3 +65,64 @@ h1, h2, h3 { font-family: var(--font-display); }
   .fade-in { animation: fade-in 0.25s ease-out both; }
   @keyframes fade-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
+
+/* Strong curves for UI motion. */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+}
+
+/* Score slider: a filled track up to the thumb, and a thumb big enough for a thumb. */
+.score-range {
+  -webkit-appearance: none; appearance: none;
+  display: block; width: 100%; height: 44px; background: transparent; cursor: pointer;
+  touch-action: pan-y;
+}
+.score-range::-webkit-slider-runnable-track {
+  height: 8px; border-radius: 999px;
+  background: linear-gradient(to right, var(--color-wine-700) var(--fill, 0%), var(--color-sand) var(--fill, 0%));
+}
+.score-range::-moz-range-track { height: 8px; border-radius: 999px; background: var(--color-sand); }
+.score-range::-moz-range-progress { height: 8px; border-radius: 999px; background: var(--color-wine-700); }
+.score-range::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 28px; height: 28px; margin-top: -10px; border-radius: 999px;
+  background: var(--color-wine-700); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(46, 11, 20, 0.35);
+}
+.score-range::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 999px;
+  background: var(--color-wine-700); border: 3px solid #fff; box-shadow: 0 1px 4px rgba(46, 11, 20, 0.35);
+}
+.score-range:focus-visible { outline: none; }
+.score-range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px var(--color-wine-200); }
+
+/* Cork pop (CorkPop.tsx). Timeline: bottle in 0–250ms, shake 260–500ms, cork out and spray from ~470ms, done ~950ms. */
+.pop-backdrop { animation: pop-fade 200ms var(--ease-out) both; }
+.pop-word { animation: pop-fade 200ms var(--ease-out) both; }
+.pop-cork, .pop-drop { opacity: 0; } /* reduced motion: the bottle is simply open */
+@keyframes pop-fade { from { opacity: 0; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pop-enter { animation: pop-enter 250ms var(--ease-out) both; }
+  .pop-shake { transform-origin: 50% 100%; animation: pop-shake 240ms var(--ease-in-out) 260ms both; }
+  .pop-cork { opacity: 1; animation: pop-cork 460ms var(--ease-out) 470ms both; }
+  .pop-drop { animation: pop-drop 420ms var(--ease-out) both; }
+  .pop-word { animation: pop-word 260ms var(--ease-out) 480ms both; }
+
+  @keyframes pop-enter { from { opacity: 0; transform: translateY(12px) scale(0.95); } }
+  @keyframes pop-shake {
+    25% { transform: rotate(-4deg); }
+    50% { transform: rotate(4deg); }
+    75% { transform: rotate(-2deg); }
+    to { transform: rotate(0); }
+  }
+  @keyframes pop-cork {
+    to { opacity: 0; transform: translate(22px, -150px) rotate(240deg); }
+  }
+  @keyframes pop-drop {
+    0% { opacity: 0; transform: translate(0, 0) scale(1); }
+    15% { opacity: 1; }
+    to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.5); }
+  }
+  @keyframes pop-word { from { opacity: 0; transform: scale(0.95); } }
+}

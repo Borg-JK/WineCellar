@@ -1,6 +1,5 @@
 import type { Wine, WineType } from '../lib/types'
 import { slug } from '../lib/util'
-import { BOTTLE_PHOTOS } from './bottlePhotos'
 import { OFF_WINES } from './offWines'
 
 /**
@@ -333,14 +332,5 @@ const fromOff: Wine[] = OFF_WINES.map((o) => ({
   photos: [], storeIds: [], ratingSum: 0, ratingCount: 0, createdBy: 'catalog', source: 'catalog' as const,
 }))
 
-export const SEED_WINES: Wine[] = [...fromRows, ...fromOff.filter((w) => !known.has(w.id))].map((w) => {
-  const off = OFF_WINES.find((o) => `cat-off-${o.code}` === w.id)
-  const photo = BOTTLE_PHOTOS[w.id]?.src ?? off?.photo
-  return photo ? { ...w, photos: [photo] } : w
-})
-
-/** Open Food Facts product page for a catalogue photo, for the licence credit. */
-export function photoCredit(wineId: string): string | null {
-  const code = BOTTLE_PHOTOS[wineId]?.code ?? (wineId.startsWith('cat-off-') ? wineId.slice(8) : null)
-  return code ? `https://world.openfoodfacts.org/product/${code}` : null
-}
+/** No bundled photos: a wine's picture is the newest bottle photo someone took of it. */
+export const SEED_WINES: Wine[] = [...fromRows, ...fromOff.filter((w) => !known.has(w.id))]

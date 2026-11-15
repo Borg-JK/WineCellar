@@ -1,7 +1,7 @@
-import { useEffect, type ReactNode } from 'react'
-import { Wine as WineIcon, X, Loader2 } from 'lucide-react'
+import { useEffect, type CSSProperties, type ReactNode } from 'react'
+import { Wine as WineIcon, X, Loader2, Minus, Plus } from 'lucide-react'
 import type { WineType } from '../lib/types'
-import { cx, fmtScore, fromTen, toTen, TYPE_COLOUR } from '../lib/util'
+import { cx, fmtScore, fromTen, isUsablePhoto, toTen, TYPE_COLOUR } from '../lib/util'
 
 export function Avatar({ src, name, size = 40 }: { src?: string; name: string; size?: number }) {
   const style = { width: size, height: size, fontSize: size * 0.4 }
@@ -14,7 +14,7 @@ export function Avatar({ src, name, size = 40 }: { src?: string; name: string; s
   )
 }
 
-/** A rating shown as a score out of 10, e.g. "8.5/10". Takes the stored 0.5–5 value. */
+/** A rating shown as a score out of 10, e.g. "8.25/10". Takes the stored 0–5 value. */
 export function Score({ value, size = 'md' }: { value: number; size?: 'sm' | 'md' }) {
   return (
     <span aria-label={`${fmtScore(value)} out of 10`}
@@ -24,30 +24,40 @@ export function Score({ value, size = 'md' }: { value: number; size?: 'sm' | 'md
   )
 }
 
-/** Pick a score from 1 to 10; tap the chosen one again to clear it. Reports the stored 0.5–5 value. */
+const STEP = 0.25
+
+/** Slide to a score from 0 to 10 in steps of 0.25; − and + fine-tune it. 0 means no score. Reports the stored 0–5 value. */
 export function ScoreInput({ value, onChange }: { value: number; onChange: (v: number) => void }) {
   const current = toTen(value)
+  const setTen = (n: number) => onChange(fromTen(Math.min(10, Math.max(0, Math.round(n / STEP) * STEP))))
+  const stepBtn = 'flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-full border border-sand bg-white text-ink/60 disabled:opacity-30'
   return (
     <div>
-      <div className="grid grid-cols-10 gap-1" role="radiogroup" aria-label="Score out of 10">
-        {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-          <button key={n} type="button" role="radio" aria-checked={current === n} aria-label={`${n} out of 10`}
-            onClick={() => onChange(current === n ? 0 : fromTen(n))}
-            className={cx('h-11 cursor-pointer rounded-lg text-[15px] font-semibold tabular-nums transition',
-              n <= current ? 'bg-wine-700 text-cream' : 'border border-sand bg-white text-ink/60')}>
-            {n}
-          </button>
-        ))}
+      <div className="mb-2 flex items-baseline justify-between">
+        <p className="font-display text-3xl font-semibold tabular-nums text-wine-700" aria-live="polite">
+          {value ? <>{fmtScore(value)}<span className="text-base text-ink/45">/10</span></> : <span className="text-base font-normal text-ink/45">Slide to score</span>}
+        </p>
+        {value > 0 && <button type="button" className="text-sm font-semibold text-ink/50" onClick={() => onChange(0)}>Clear</button>}
       </div>
-      <p className="mt-2 font-display text-2xl font-semibold tabular-nums text-wine-700">
-        {value ? <>{current}<span className="text-base text-ink/45">/10</span></> : <span className="text-base font-normal text-ink/45">Tap a score</span>}
-      </p>
+      <div className="flex items-center gap-3">
+        <button type="button" aria-label="0.25 lower" className={stepBtn} disabled={current <= 0} onClick={() => setTen(current - STEP)}><Minus size={18} /></button>
+        <div className="min-w-0 flex-1">
+          <input type="range" min={0} max={10} step={STEP} value={current} aria-label="Score out of 10"
+            aria-valuetext={value ? `${fmtScore(value)} out of 10` : 'No score'}
+            onChange={(e) => setTen(Number(e.target.value))}
+            className="score-range" style={{ '--fill': `${current * 10}%` } as CSSProperties} />
+          <div className="mt-1 flex justify-between px-[3px] text-[11px] tabular-nums text-ink/40" aria-hidden>
+            {[0, 2, 4, 6, 8, 10].map((n) => <span key={n}>{n}</span>)}
+          </div>
+        </div>
+        <button type="button" aria-label="0.25 higher" className={stepBtn} disabled={current >= 10} onClick={() => setTen(current + STEP)}><Plus size={18} /></button>
+      </div>
     </div>
   )
 }
 
 export function BottleImage({ src, type, className }: { src?: string; type: WineType; className?: string }) {
-  return src ? (
+  return isUsablePhoto(src) ? (
     <img src={src} alt="" loading="lazy" className={cx('object-cover', className)} />
   ) : (
     <div className={cx('flex items-center justify-center', className)} style={{ background: `${TYPE_COLOUR[type]}22` }}>

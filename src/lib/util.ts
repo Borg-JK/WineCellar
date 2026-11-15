@@ -13,6 +13,14 @@ export function timeAgo(ms: number) {
   return new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+/** "14 Nov" for a YYYY-MM-DD date, with the year added when it isn't this year. */
+export function fmtDay(iso: string) {
+  const d = new Date(iso + 'T12:00:00')
+  if (isNaN(d.getTime())) return iso
+  const sameYear = d.getFullYear() === new Date().getFullYear()
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) })
+}
+
 export const euro = (n: number) =>
   new Intl.NumberFormat('nl-NL', { style: 'currency', currency: 'EUR' }).format(n)
 
@@ -37,13 +45,17 @@ export const checkinCost = (c: Pick<Checkin, 'price' | 'serving' | 'glasses'>) =
 export const servingLabel = (c: Pick<Checkin, 'serving' | 'glasses'>) =>
   c.serving === 'glass' ? ((c.glasses ?? 1) > 1 ? `${c.glasses} glasses` : 'A glass') : ''
 
-export const snapOf = (w: Wine, fallbackPhoto = ''): WineSnap => ({
+/** Bundled Open Food Facts photos lived under /bottles/; they are gone, and old references to them are ignored. */
+export const isUsablePhoto = (url: string | undefined | null): url is string => !!url && !url.startsWith('/bottles/')
+
+/** `newestPhoto` (a bottle photo just taken) wins over the wine's current main photo. */
+export const snapOf = (w: Wine, newestPhoto = ''): WineSnap => ({
   id: w.id,
   name: w.name,
   producer: w.producer,
   type: w.type,
   country: w.country,
-  photo: w.photos[0] ?? fallbackPhoto,
+  photo: newestPhoto || w.photos.find(isUsablePhoto) || '',
 })
 
 /**
@@ -53,8 +65,8 @@ export const snapOf = (w: Wine, fallbackPhoto = ''): WineSnap => ({
 export const toTen = (stored: number) => stored * 2
 export const fromTen = (score: number) => score / 2
 export const fmtScore = (stored: number) => {
-  const s = toTen(stored)
-  return Number.isInteger(s) ? String(s) : s.toFixed(1)
+  // Scores go in steps of 0.25 (7, 7.25, 7.5…); averages are rounded to two decimals.
+  return String(Number(toTen(stored).toFixed(2)))
 }
 
 export const avgRating = (w: Pick<Wine, 'ratingSum' | 'ratingCount'>) =>

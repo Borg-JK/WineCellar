@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ChevronDown, GlassWater, Lock, Minus, Plus, RotateCcw, Warehouse, Wine as WineIcon, X } from 'lucide-react'
 import { addToCellar, createCheckin, updateCheckin } from '../lib/db'
 import { FLAVOUR_TAGS, OCCASIONS, type Checkin, type CheckinInput, type Serving } from '../lib/types'
-import { cx, errMsg, euro, lastPurchase, today } from '../lib/util'
+import { cx, errMsg, euro, fmtDay, lastPurchase, today } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { WineSearch } from './Explore'
 import { PhotoPicker } from '../components/PhotoPicker'
@@ -64,6 +64,8 @@ export function LogWine({ editing }: { editing?: Checkin } = {}) {
   const fromCellar = byGlass ? undefined : cellarChoice === null
     ? owned.find((c) => c.id === params.get('cellar')) ?? owned[0]
     : owned.find((c) => c.id === cellarChoice)
+  // Did you empty the bottle? If not, it stays in the cellar marked as open.
+  const [finished, setFinished] = useState(true)
   const [moreAtHome, setMoreAtHome] = useState(0)
   const [tags, setTags] = useState<string[]>(e0?.tags ?? [])
   const [withUids, setWithUids] = useState<string[]>(e0?.withUids ?? [])
@@ -104,7 +106,7 @@ export function LogWine({ editing }: { editing?: Checkin } = {}) {
         await updateCheckin({ c: editing, input, friendIds, keepMoments, newMoments: moments })
         goBack()
       } else {
-        await createCheckin({ me, wine: wine!, friendIds, bottleFiles: bottle, momentFiles: moments, fromCellar, input })
+        await createCheckin({ me, wine: wine!, friendIds, bottleFiles: bottle, momentFiles: moments, fromCellar, finished, input })
         if (moreAtHome > 0) {
           await addToCellar(me.id, wine!, {
             quantity: moreAtHome, vintage: input.vintage, storeName: input.storeName, price: input.price, purchasedAt: f.drankAt,
@@ -150,7 +152,7 @@ export function LogWine({ editing }: { editing?: Checkin } = {}) {
             <label key={c.id} className="flex cursor-pointer items-center gap-3 rounded-lg px-1 py-1.5 text-sm">
               <input type="radio" name="from-cellar" className="h-4 w-4 accent-wine-700" checked={fromCellar?.id === c.id} onChange={() => setCellarChoice(c.id)} />
               <span className="flex-1">
-                <b>{c.vintage ?? 'No year'}</b> · {c.quantity} at home
+                <b>{c.vintage ?? 'No year'}</b> · {c.quantity} at home{c.openedAt && <span className="font-medium text-wine-700"> · 1 open</span>}
                 <span className="text-ink/55">{[c.storeName, c.price != null ? euro(c.price) : ''].filter(Boolean).map((x) => ` · ${x}`).join('')}</span>
               </span>
             </label>
@@ -159,7 +161,27 @@ export function LogWine({ editing }: { editing?: Checkin } = {}) {
             <input type="radio" name="from-cellar" className="h-4 w-4 accent-wine-700" checked={!fromCellar} onChange={() => setCellarChoice('')} />
             <span className="flex-1 text-ink/70">No, a different bottle</span>
           </label>
-          {fromCellar && <p className="px-1 text-xs text-ink/55">One bottle comes off your stock. Year, store and price are taken from the cellar.</p>}
+          {fromCellar && (
+            <div className="space-y-2 border-t border-sand px-1 pt-3">
+              <p className="text-sm font-semibold text-wine-800">
+                {fromCellar.openedAt ? `From the bottle you opened on ${fmtDay(fromCellar.openedAt)}. Is it empty now?` : 'Did you finish the bottle?'}
+              </p>
+              <div className="flex rounded-full bg-sand p-1" role="radiogroup" aria-label="Did you finish the bottle?">
+                {([[true, 'Finished it'], [false, 'Some left']] as const).map(([v, label]) => (
+                  <button type="button" key={label} role="radio" aria-checked={finished === v} onClick={() => setFinished(v)}
+                    className={cx('flex-1 cursor-pointer rounded-full px-3 py-1.5 text-sm font-semibold transition', finished === v ? 'bg-white text-wine-800 shadow-sm' : 'text-ink/55')}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-ink/55">
+                {finished
+                  ? 'One bottle comes off your stock.'
+                  : fromCellar.openedAt ? 'The bottle stays in your cellar as open.' : 'The bottle stays in your cellar, marked as open.'}
+                {' '}Year, store and price are taken from the cellar.
+              </p>
+            </div>
+          )}
         </div>
       )}
 
@@ -179,7 +201,7 @@ export function LogWine({ editing }: { editing?: Checkin } = {}) {
       {!editing && (
         <div>
           <span className="label">Bottle photos</span>
-          <p className="mb-2 text-xs text-ink/55">Label shots. These are added to the wine's page so everyone can recognise the bottle.</p>
+          <p className="mb-2 text-xs text-ink/55">Label shots. Your newest photo becomes the picture of this wine for everyone.</p>
           <PhotoPicker files={bottle} onChange={setBottle} max={3} />
         </div>
       )}

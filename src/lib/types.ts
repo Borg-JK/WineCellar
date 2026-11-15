@@ -57,6 +57,10 @@ export interface UserProfile {
   username: string
   photoURL: string
   bio: string
+  /** Friends can see your check-ins and wines on your profile. Missing means yes. */
+  shareHistory?: boolean
+  /** Friends can see the bottles in your cellar. Missing means no. */
+  shareCellar?: boolean
 }
 
 export interface Friendship {
@@ -134,6 +138,8 @@ export interface CellarItem {
   drinkBy: number | null
   location: string
   notes: string
+  /** Date (YYYY-MM-DD) one bottle of this entry was opened and not finished; empty when none is open. */
+  openedAt?: string | null
   createdAt: number
 }
 

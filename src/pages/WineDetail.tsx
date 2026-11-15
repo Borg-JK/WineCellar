@@ -5,7 +5,7 @@ import { addBottlePhotos, addToCellar, toggleWishlist } from '../lib/db'
 import { avgRating, cx, errMsg, fmtScore, producerIdOf } from '../lib/util'
 import { useApp, useMe } from '../state/AppContext'
 import { CellarForm } from '../components/CellarForm'
-import { photoCredit } from '../data/seedWines'
+import { BottlePhotoField } from './Cellar'
 import { CheckinCard } from '../components/CheckinCard'
 import { BottleImage, Empty, Lightbox, Sheet, Spinner, Score, TypeDot } from '../components/ui'
 
@@ -18,6 +18,7 @@ export function WineDetail() {
   const [cellarOpen, setCellarOpen] = useState(params.get('cellar') === 'add')
   const [zoom, setZoom] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
+  const [cellarPhotos, setCellarPhotos] = useState<File[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (!wine) return <Empty icon={<Camera size={26} />} title="Wine not found"><Link to="/explore" className="btn btn-soft mt-3">Back to Explore</Link></Empty>
@@ -47,11 +48,6 @@ export function WineDetail() {
         ))}
       </div>
 
-      {wine.photos.some((p) => p.startsWith('/bottles/')) && photoCredit(wine.id) && (
-        <p className="-mt-3 text-right text-[11px] text-ink/40">
-          Bottle photo: <a href={photoCredit(wine.id)!} target="_blank" rel="noreferrer" className="underline">Open Food Facts</a>, CC BY-SA
-        </p>
-      )}
       <div>
         <Link to={`/producers/${producerIdOf(wine)}`} className="text-sm font-medium uppercase tracking-wide text-ink/50 underline decoration-sand underline-offset-4">{wine.producer}</Link>
         <h1 className="text-3xl font-semibold leading-tight">{wine.name}</h1>
@@ -106,7 +102,13 @@ export function WineDetail() {
       )}
 
       <Sheet open={cellarOpen} onClose={() => setCellarOpen(false)} title="Add to cellar">
-        <CellarForm wineId={wine.id} submitLabel="Add to cellar" onSubmit={async (v) => { await addToCellar(me.id, wine, v, cellar); setCellarOpen(false) }} />
+        <CellarForm wineId={wine.id} submitLabel="Add to cellar" onSubmit={async (v) => {
+          await addToCellar(me.id, wine, v, cellar)
+          if (cellarPhotos.length) await addBottlePhotos(wine, me.id, cellarPhotos)
+          setCellarPhotos([]); setCellarOpen(false)
+        }}>
+          <BottlePhotoField files={cellarPhotos} onChange={setCellarPhotos} hasPhoto={wine.photos.length > 0} />
+        </CellarForm>
       </Sheet>
       <Lightbox src={zoom} onClose={() => setZoom(null)} />
     </div>

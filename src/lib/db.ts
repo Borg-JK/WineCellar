@@ -8,7 +8,7 @@ import { deleteImage, uploadImage } from './images'
 import type {
   CellarInput, CellarItem, Checkin, CheckinInput, Store, UserProfile, Wine, WineSnap,
 } from './types'
-import { slug, snapOf } from './util'
+import { isUsablePhoto, slug, snapOf } from './util'
 
 type Snap = QueryDocumentSnapshot<DocumentData> | DocumentSnapshot<DocumentData>
 
@@ -40,7 +40,7 @@ export async function createProfile(uid: string, displayName: string, username: 
   await batch.commit()
 }
 
-export async function updateProfileDoc(uid: string, data: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'photoURL'>>) {
+export async function updateProfileDoc(uid: string, data: Partial<Pick<UserProfile, 'displayName' | 'bio' | 'photoURL' | 'shareHistory' | 'shareCellar'>>) {
   await updateDoc(doc(db, 'users', uid), data)
 }
 
@@ -125,10 +125,14 @@ async function uploadBottlePhotos(wineId: string, uid: string, files: File[]) {
   return Promise.all(files.map((f, i) => uploadImage(`wines/${wineId}/${uid}_${stamp}_${i}.jpg`, f)))
 }
 
+/** The newest bottle photos go first, so the last photo someone took becomes the wine's main picture. */
+const newestFirst = (added: string[], current: string[]) =>
+  [...added, ...current.filter((p) => isUsablePhoto(p) && !added.includes(p))]
+
 export async function addBottlePhotos(wine: Wine, uid: string, files: File[]) {
   await ensureWine(wine, uid)
   const urls = await uploadBottlePhotos(wine.id, uid, files)
-  if (urls.length) await updateDoc(doc(db, 'wines', wine.id), { photos: arrayUnion(...urls) })
+  if (urls.length) await updateDoc(doc(db, 'wines', wine.id), { photos: newestFirst(urls, wine.photos) })
   return urls
 }
 
@@ -148,8 +152,10 @@ export async function createCheckin(opts: {
   bottleFiles: File[]
   momentFiles: File[]
   fromCellar?: CellarItem
+  /** With `fromCellar`: false keeps the bottle in the cellar, marked as open. */
+  finished?: boolean
 }) {
-  const { me, wine, input, friendIds, bottleFiles, momentFiles, fromCellar } = opts
+  const { me, wine, input, friendIds, bottleFiles, momentFiles, fromCellar, finished = true } = opts
   await ensureWine(wine, me.id)
   const r = doc(collection(db, 'checkins'))
   const [bottlePhotos, momentPhotos] = await Promise.all([
@@ -175,10 +181,13 @@ export async function createCheckin(opts: {
     wineUpdate.ratingSum = increment(input.rating)
     wineUpdate.ratingCount = increment(1)
   }
-  if (bottlePhotos.length) wineUpdate.photos = arrayUnion(...bottlePhotos)
+  if (bottlePhotos.length) wineUpdate.photos = newestFirst(bottlePhotos, wine.photos)
   if (input.storeId) wineUpdate.storeIds = arrayUnion(input.storeId)
   if (Object.keys(wineUpdate).length) await updateDoc(doc(db, 'wines', wine.id), wineUpdate)
-  if (fromCellar) await changeCellarQuantity(me.id, fromCellar, -1)
+  if (fromCellar) {
+    if (finished) await finishBottle(me.id, fromCellar)
+    else if (!fromCellar.openedAt) await markOpened(me.id, fromCellar, input.drankAt || new Date().toISOString().slice(0, 10))
+  }
   return r.id
 }
 
@@ -267,7 +276,7 @@ export async function addToCellar(uid: string, wine: Wine, input: CellarInput, c
   const match = sameCellarEntry(current, wine.id, input.vintage)
   if (match) {
     const fill: DocumentData = { quantity: increment(input.quantity) }
-    for (const k of ['storeName', 'price', 'drinkFrom', 'drinkBy', 'location', 'notes'] as const) {
+    for (const k of ['storeName', 'price', 'drinkFrom', 'drinkBy', 'location', 'notes', 'openedAt'] as const) {
       if ((match[k] == null || match[k] === '') && input[k] != null && input[k] !== '') fill[k] = input[k]
     }
     return updateDoc(doc(db, 'users', uid, 'cellar', match.id), fill)
@@ -275,6 +284,12 @@ export async function addToCellar(uid: string, wine: Wine, input: CellarInput, c
   await addDoc(collection(db, 'users', uid, 'cellar'), {
     ...input, wineId: wine.id, wine: snapOf(wine), createdAt: serverTimestamp(),
   })
+}
+
+/** A friend's cellar; only readable when they share it (see firestore.rules). */
+export async function getFriendCellar(uid: string): Promise<CellarItem[]> {
+  const s = await getDocs(collection(db, 'users', uid, 'cellar'))
+  return s.docs.map((d) => read<CellarItem>(d)).sort((a, b) => b.createdAt - a.createdAt)
 }
 
 export const updateCellarItem = (uid: string, id: string, input: Partial<CellarInput>) =>
@@ -285,6 +300,16 @@ export const removeCellarItem = (uid: string, id: string) => deleteDoc(doc(db, '
 export async function changeCellarQuantity(uid: string, item: CellarItem, delta: number) {
   if (item.quantity + delta <= 0) return removeCellarItem(uid, item.id)
   return updateDoc(doc(db, 'users', uid, 'cellar', item.id), { quantity: increment(delta) })
+}
+
+/** One bottle of this entry is open (opened on `date`) but not finished; it stays in the cellar. */
+export const markOpened = (uid: string, item: CellarItem, date: string) =>
+  updateDoc(doc(db, 'users', uid, 'cellar', item.id), { openedAt: date })
+
+/** A bottle is empty: one comes off the stock, and the entry no longer has an open bottle. */
+export async function finishBottle(uid: string, item: CellarItem) {
+  if (item.quantity <= 1) return removeCellarItem(uid, item.id)
+  return updateDoc(doc(db, 'users', uid, 'cellar', item.id), { quantity: increment(-1), openedAt: null })
 }
 
 export async function toggleWishlist(uid: string, wine: Wine, on: boolean) {

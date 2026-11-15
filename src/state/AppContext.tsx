@@ -4,7 +4,7 @@ import { collection, doc, limit, onSnapshot, orderBy, query, where } from 'fireb
 import { auth, db } from '../lib/firebase'
 import { getProfile, read, syncVisibility } from '../lib/db'
 import type { CellarItem, Checkin, Friendship, Producer, Store, UserProfile, Wine, WishlistItem } from '../lib/types'
-import { producerIdOf } from '../lib/util'
+import { isUsablePhoto, producerIdOf } from '../lib/util'
 import { SEED_PRODUCERS } from '../data/seedProducers'
 import { SEED_WINES } from '../data/seedWines'
 import { SEED_STORES } from '../data/seedStores'
@@ -98,7 +98,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }, log('friendships')),
       onSnapshot(collection(db, 'wines'), (s) => setDbWines(s.docs.map((d) => {
         const w = read<Wine>(d)
-        return { ...w, grapes: w.grapes ?? [], photos: w.photos ?? [], storeIds: w.storeIds ?? [], ratingSum: w.ratingSum ?? 0, ratingCount: w.ratingCount ?? 0 }
+        return { ...w, grapes: w.grapes ?? [], photos: (w.photos ?? []).filter(isUsablePhoto), storeIds: w.storeIds ?? [], ratingSum: w.ratingSum ?? 0, ratingCount: w.ratingCount ?? 0 }
       })), log('wines')),
       onSnapshot(collection(db, 'stores'), (s) => setDbStores(s.docs.map((d) => read<Store>(d))), log('stores')),
       onSnapshot(collection(db, 'producers'), (s) => setDbProducers(s.docs.map((d) => ({ ...read<Producer>(d), source: 'user' as const }))), log('producers')),
@@ -136,11 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const wines = useMemo(() => {
     const m = new Map<string, Wine>(SEED_WINES.map((w) => [w.id, w]))
-    // A catalogue wine copied to Firestore keeps its bundled bottle photo after any user photos.
-    for (const w of dbWines) {
-      const seed = m.get(w.id)
-      m.set(w.id, seed?.photos.length ? { ...w, photos: [...new Set([...w.photos, ...seed.photos])] } : w)
-    }
+    for (const w of dbWines) m.set(w.id, w)
     return [...m.values()].sort((a, b) => `${a.producer} ${a.name}`.localeCompare(`${b.producer} ${b.name}`))
   }, [dbWines])
   const wineMap = useMemo(() => new Map(wines.map((w) => [w.id, w])), [wines])

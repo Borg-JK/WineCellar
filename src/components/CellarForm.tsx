@@ -26,7 +26,9 @@ export function CellarForm({ initial, onSubmit, submitLabel, children, wineId }:
     drinkBy: initial?.drinkBy ? String(initial.drinkBy) : '',
     location: initial?.location ?? '',
     notes: initial?.notes ?? '',
+    openedAt: initial?.openedAt ?? '',
   })
+  const [isOpen, setIsOpen] = useState(!!initial?.openedAt)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value })
@@ -41,6 +43,7 @@ export function CellarForm({ initial, onSubmit, submitLabel, children, wineId }:
         quantity: Math.max(1, Math.round(num(f.quantity) ?? 1)),
         vintage: num(f.vintage), storeName: f.storeName.trim(), price: num(f.price), purchasedAt: f.purchasedAt,
         drinkFrom: num(f.drinkFrom), drinkBy: num(f.drinkBy), location: f.location.trim(), notes: f.notes.trim(),
+        openedAt: isOpen ? f.openedAt || today() : null,
       })
     } catch (err) { setError(errMsg(err)); setBusy(false) }
   }
@@ -63,6 +66,15 @@ export function CellarForm({ initial, onSubmit, submitLabel, children, wineId }:
       </div>
       <Field label="Bought on"><input className="input" type="date" value={f.purchasedAt} onChange={set('purchasedAt')} /></Field>
       <Field label="Where is it stored?"><input className="input" placeholder="Wine rack, top shelf, fridge…" value={f.location} onChange={set('location')} /></Field>
+      <div className="rounded-xl bg-white px-3.5 py-2.5 ring-1 ring-sand">
+        <label className="flex cursor-pointer items-center gap-3 text-sm">
+          <input type="checkbox" className="h-5 w-5 accent-wine-700" checked={isOpen} onChange={(e) => setIsOpen(e.target.checked)} />
+          <span className="flex-1">One bottle is open <span className="text-ink/50">— started, not finished</span></span>
+        </label>
+        {isOpen && (
+          <Field label="Opened on"><input className="input mt-1" type="date" max={today()} value={f.openedAt || today()} onChange={set('openedAt')} /></Field>
+        )}
+      </div>
       <Field label="Notes"><input className="input" placeholder="Saving it for…" value={f.notes} onChange={set('notes')} /></Field>
       {!initial && wineId && (() => {
         const match = sameCellarEntry(cellar, wineId, num(f.vintage))

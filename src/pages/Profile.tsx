@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { collection, getDocs, query, where } from 'firebase/firestore'
-import { Camera, LogOut, Pencil, Users, Wine as WineIcon } from 'lucide-react'
+import { Camera, Clock, GlassWater, Lock, LogOut, Pencil, Users, Warehouse, Wine as WineIcon } from 'lucide-react'
 import { auth, db } from '../lib/firebase'
-import { getProfile, read, updateProfileDoc, uploadAvatar } from '../lib/db'
+import { getFriendCellar, getProfile, read, updateProfileDoc, uploadAvatar } from '../lib/db'
 import { computeBadges, computeStats } from '../lib/stats'
-import type { Checkin, UserProfile, Wine, WineSnap } from '../lib/types'
-import { cx, errMsg, euro, fmtScore, TYPE_COLOUR } from '../lib/util'
+import type { CellarItem, Checkin, UserProfile, Wine, WineSnap } from '../lib/types'
+import { cx, errMsg, euro, fmtDay, fmtScore, TYPE_COLOUR } from '../lib/util'
 import { checkinDefaults, useApp, useMe } from '../state/AppContext'
 import { CheckinCard } from '../components/CheckinCard'
 import { WineRow } from '../components/WineCard'
@@ -23,7 +23,8 @@ export function Profile() {
 
   const [other, setOther] = useState<UserProfile | null | undefined>(undefined)
   const [theirs, setTheirs] = useState<Checkin[] | null>(null)
-  const [tab, setTab] = useState<'activity' | 'wines' | 'stats' | 'badges'>('activity')
+  const [tab, setTab] = useState<'activity' | 'wines' | 'stats' | 'badges' | 'cellar'>('activity')
+  const [theirCellar, setTheirCellar] = useState<CellarItem[] | null>(null)
   const [editOpen, setEditOpen] = useState(false)
 
   useEffect(() => {
@@ -41,6 +42,15 @@ export function Profile() {
   }, [uid, isMe, isFriend, me.id])
 
   const person = isMe ? me : other
+  // What a friend chose to show: history unless they turned it off, the cellar only if they turned it on.
+  const showsHistory = isMe || person?.shareHistory !== false
+  const showsCellar = !isMe && isFriend && person?.shareCellar === true
+
+  useEffect(() => {
+    setTheirCellar(null)
+    if (!showsCellar) return
+    getFriendCellar(uid!).then(setTheirCellar).catch(() => setTheirCellar([]))
+  }, [uid, showsCellar])
   const checkins = useMemo(
     () => (isMe ? myCheckins : (theirs ?? feed.filter((c) => c.uid === uid)).map(checkinDefaults)),
     [isMe, myCheckins, theirs, feed, uid],
@@ -52,6 +62,11 @@ export function Profile() {
   if (person === null) return <Empty icon={<WineIcon size={26} />} title="User not found" />
 
   const maxType = Math.max(1, ...stats.byType.map(([, n]) => n))
+  const tabs = [
+    ...(showsHistory ? [{ id: 'activity' as const, label: 'Activity' }, { id: 'wines' as const, label: 'Wines' }, { id: 'stats' as const, label: 'Taste' }, { id: 'badges' as const, label: 'Badges' }] : []),
+    ...(showsCellar ? [{ id: 'cellar' as const, label: 'Cellar' }] : []),
+  ]
+  const shownTab = tabs.some((t) => t.id === tab) ? tab : tabs[0]?.id
 
   return (
     <div className="space-y-5">
@@ -78,22 +93,26 @@ export function Profile() {
 
       {!isMe && !isFriend ? (
         <Empty icon={<WineIcon size={26} />} title="Friends only">Become friends to see what {person.displayName} has been drinking.</Empty>
+      ) : tabs.length === 0 ? (
+        <Empty icon={<Lock size={26} />} title="Kept private">{person.displayName} doesn't share their history or cellar on their profile.</Empty>
       ) : (
         <>
-          <div className="grid grid-cols-4 gap-2 text-center">
+          {showsHistory && <div className="grid grid-cols-4 gap-2 text-center">
             {[[stats.total, 'check-ins'], [stats.uniqueWines, 'wines'], [stats.avg ? `${fmtScore(stats.avg)}` : '–', 'avg /10'], [badges.filter((b) => b.earned).length, 'badges']].map(([n, l]) => (
               <div key={l} className="card px-1 py-3"><p className="font-display text-xl font-semibold text-wine-700">{n}</p><p className="text-[11px] text-ink/55">{l}</p></div>
             ))}
-          </div>
-          <Tabs value={tab} onChange={setTab} options={[{ id: 'activity', label: 'Activity' }, { id: 'wines', label: 'Wines' }, { id: 'stats', label: 'Taste' }, { id: 'badges', label: 'Badges' }]} />
+          </div>}
+          {tabs.length > 1 && <Tabs value={shownTab!} onChange={setTab} options={tabs} />}
 
-          {tab === 'activity' && (checkins.length === 0
+          {shownTab === 'cellar' && <FriendCellar items={theirCellar} name={person.displayName} />}
+
+          {shownTab === 'activity' && (checkins.length === 0
             ? <Empty icon={<WineIcon size={26} />} title="No check-ins yet" />
             : <div className="space-y-4">{checkins.slice(0, 50).map((c) => <CheckinCard key={c.id} c={c} />)}</div>)}
 
-          {tab === 'wines' && <TastedWines checkins={checkins} isMe={isMe} />}
+          {shownTab === 'wines' && <TastedWines checkins={checkins} isMe={isMe} />}
 
-          {tab === 'stats' && (stats.total === 0 ? <Empty icon={<WineIcon size={26} />} title="Log a few wines first">Your taste profile builds itself from your check-ins.</Empty> : (
+          {shownTab === 'stats' && (stats.total === 0 ? <Empty icon={<WineIcon size={26} />} title="Log a few wines first">Your taste profile builds itself from your check-ins.</Empty> : (
             <div className="space-y-4">
               <section className="card space-y-2.5 p-4">
                 <h2 className="text-lg font-semibold">By type</h2>
@@ -121,7 +140,7 @@ export function Profile() {
             </div>
           ))}
 
-          {tab === 'badges' && (
+          {shownTab === 'badges' && (
             <div className="grid grid-cols-2 gap-2.5">
               {badges.map((b) => (
                 <div key={b.id} className={cx('card p-3.5', !b.earned && 'opacity-55')}>
@@ -136,6 +155,29 @@ export function Profile() {
         </>
       )}
       {isMe && <EditProfile open={editOpen} onClose={() => setEditOpen(false)} />}
+    </div>
+  )
+}
+
+/** A friend's bottles at home, read-only. Prices and notes stay private. */
+function FriendCellar({ items, name }: { items: CellarItem[] | null; name: string }) {
+  const { wineMap } = useApp()
+  if (items === null) return <FullSpinner />
+  if (items.length === 0) return <Empty icon={<Warehouse size={26} />} title="Empty cellar">{name} has no bottles at home right now.</Empty>
+  const total = items.reduce((s, i) => s + i.quantity, 0)
+  return (
+    <div className="space-y-3">
+      <p className="px-1 text-xs text-ink/50">{total} bottle{total === 1 ? '' : 's'} at home</p>
+      {items.map((i) => (
+        <WineRow key={i.id} wine={wineMap.get(i.wineId) ?? i.wine} to={`/wines/${i.wineId}`} hideRating sub={
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-ink/60">
+            <span className="font-semibold text-wine-800">{i.quantity}×</span>
+            {i.vintage && <span className="rounded bg-wine-50 px-1.5 font-semibold text-wine-800">{i.vintage}</span>}
+            {i.openedAt && <span className="inline-flex items-center gap-1 text-wine-700"><GlassWater size={12} /> open since {fmtDay(i.openedAt)}</span>}
+            {i.drinkBy && <span className="inline-flex items-center gap-1"><Clock size={12} /> by {i.drinkBy}</span>}
+          </p>
+        } />
+      ))}
     </div>
   )
 }
@@ -214,6 +256,8 @@ function EditProfile({ open, onClose }: { open: boolean; onClose: () => void }) 
   const me = useMe()
   const [displayName, setDisplayName] = useState(me.displayName)
   const [bio, setBio] = useState(me.bio)
+  const [shareHistory, setShareHistory] = useState(me.shareHistory !== false)
+  const [shareCellar, setShareCellar] = useState(me.shareCellar === true)
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -225,7 +269,7 @@ function EditProfile({ open, onClose }: { open: boolean; onClose: () => void }) 
     setBusy(true); setError('')
     try {
       const photoURL = file ? await uploadAvatar(me.id, file) : me.photoURL
-      await updateProfileDoc(me.id, { displayName: displayName.trim(), bio: bio.trim(), photoURL })
+      await updateProfileDoc(me.id, { displayName: displayName.trim(), bio: bio.trim(), photoURL, shareHistory, shareCellar })
       setFile(null); onClose()
     } catch (err) { setError(errMsg(err)) } finally { setBusy(false) }
   }
@@ -241,6 +285,19 @@ function EditProfile({ open, onClose }: { open: boolean; onClose: () => void }) 
         <Field label="Name"><input className="input" required maxLength={40} value={displayName} onChange={(e) => setDisplayName(e.target.value)} /></Field>
         <Field label="Bio"><input className="input" maxLength={120} placeholder="Riesling evangelist" value={bio} onChange={(e) => setBio(e.target.value)} /></Field>
         <p className="text-xs text-ink/50">New name and photo show on check-ins you log from now on.</p>
+        <div>
+          <span className="label">What friends see on your profile</span>
+          <div className="card divide-y divide-sand">
+            <label className="flex cursor-pointer items-center gap-3 p-3.5">
+              <span className="flex-1 text-sm font-medium">Your history<span className="block text-xs font-normal text-ink/50">Check-ins, wines tasted, taste profile and badges. Check-ins still show in friends' feeds unless you set them to "Only me".</span></span>
+              <input type="checkbox" className="h-5 w-5 accent-wine-700" checked={shareHistory} onChange={(e) => setShareHistory(e.target.checked)} />
+            </label>
+            <label className="flex cursor-pointer items-center gap-3 p-3.5">
+              <span className="flex-1 text-sm font-medium">Your cellar<span className="block text-xs font-normal text-ink/50">Which bottles you have at home, with year and drinking window. Prices and notes stay private.</span></span>
+              <input type="checkbox" className="h-5 w-5 accent-wine-700" checked={shareCellar} onChange={(e) => setShareCellar(e.target.checked)} />
+            </label>
+          </div>
+        </div>
         <ErrorNote>{error}</ErrorNote>
         <button className="btn btn-primary w-full" disabled={busy}>{busy && <Spinner />}Save</button>
       </form>
